@@ -23,6 +23,10 @@ export default defineConfig({
     {
       name: 'mobile',
       testDir: './ui',
+      // Only run the shopping spec (touch/swipe behaviour) on mobile.
+      // Running all UI specs on both chrome + mobile simultaneously causes
+      // server-state races because both projects share the same backend.
+      testMatch: '**/shopping.spec.ts',
       // Device emulation: 412×915 viewport, touch events, Pixel 7 UA.
       // Runs fully headless — no physical device or Xvfb needed.
       use: devices['Pixel 7'],

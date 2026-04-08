@@ -66,11 +66,16 @@ test.describe('Settings › Shops', () => {
     })
 
     await gotoApp('/settings')
-    await expect(page.getByText('Shop To Delete')).toBeVisible()
+    // Use exact span to avoid matching parent containers in strict mode
+    const shopNameEl = page.locator('span.flex-1', { hasText: 'Shop To Delete' })
+    await expect(shopNameEl).toBeVisible()
 
-    const shopRow = page.locator('div').filter({ hasText: 'Shop To Delete' }).first()
+    // Navigate up to the flex row and find the delete button within it
+    const shopRow = page.locator('div.flex.items-center').filter({
+      has: page.locator('span.flex-1', { hasText: 'Shop To Delete' }),
+    })
     await shopRow.getByRole('button', { name: 'Delete shop' }).click()
 
-    await expect(page.getByText('Shop To Delete')).not.toBeVisible()
+    await expect(shopNameEl).not.toBeVisible()
   })
 })

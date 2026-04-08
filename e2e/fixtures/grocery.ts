@@ -119,21 +119,28 @@ export const test = base.extend<GroceryFixtures>({
 
   gotoApp: async ({ page }, use) => {
     await use(async (path = '/') => {
-      // Ensure we're on the origin so we can reach IndexedDB
+      // Step 1: land on origin so we can access IndexedDB
       if (!page.url().startsWith('http://localhost:8080')) {
         await page.goto('http://localhost:8080/')
       }
+      // Step 2: wipe local DB so the app bootstraps fresh from the server
       await page.evaluate(async () => {
         await new Promise<void>(resolve => {
           const req = indexedDB.deleteDatabase('grocery')
-          req.onsuccess = () => resolve()
-          req.onerror = () => resolve()
+          req.onsuccess = req.onerror = () => resolve()
           req.onblocked = () => resolve()
         })
       })
-      await page.goto(`http://localhost:8080${path}`)
-      // networkidle covers the bootstrap/sync fetch + Dexie writes
+      // Step 3: bootstrap at root — networkidle means the bootstrap fetch +
+      // all Dexie writes have completed before we proceed.
+      await page.goto('http://localhost:8080/')
       await page.waitForLoadState('networkidle')
+      // Step 4: navigate to the actual target; Dexie is pre-populated so
+      // every component's useEffect will find data on first read.
+      if (path !== '/') {
+        await page.goto(`http://localhost:8080${path}`)
+        await page.waitForLoadState('networkidle')
+      }
     })
   },
 
@@ -145,11 +152,14 @@ export const test = base.extend<GroceryFixtures>({
       await page.evaluate(async () => {
         await new Promise<void>(resolve => {
           const req = indexedDB.deleteDatabase('grocery')
-          req.onsuccess = () => resolve()
-          req.onerror = () => resolve()
+          req.onsuccess = req.onerror = () => resolve()
           req.onblocked = () => resolve()
         })
       })
+      // Bootstrap at root first so Dexie is populated
+      await page.goto('http://localhost:8080/')
+      await page.waitForLoadState('networkidle')
+      // Then navigate to the list
       await page.goto(`http://localhost:8080/list/${listId}`)
       await page.waitForLoadState('networkidle')
     })
