@@ -86,8 +86,10 @@ func applyChanges(db *sql.DB, req models.SyncRequest, resp *models.SyncResponse)
 
 	for _, x := range req.Changes.ItemShops {
 		if _, err := tx.Exec(
-			`INSERT OR IGNORE INTO item_shops(item_id, shop_id) VALUES(?,?)`,
-			x.ItemID, x.ShopID,
+			`INSERT OR IGNORE INTO item_shops(item_id, shop_id)
+			 SELECT ?,? WHERE EXISTS (SELECT 1 FROM items WHERE id=?)
+			              AND EXISTS (SELECT 1 FROM shops WHERE id=?)`,
+			x.ItemID, x.ShopID, x.ItemID, x.ShopID,
 		); err != nil {
 			return err
 		}
@@ -95,8 +97,10 @@ func applyChanges(db *sql.DB, req models.SyncRequest, resp *models.SyncResponse)
 
 	for _, x := range req.Changes.ItemTags {
 		if _, err := tx.Exec(
-			`INSERT OR IGNORE INTO item_tags(item_id, tag_id) VALUES(?,?)`,
-			x.ItemID, x.TagID,
+			`INSERT OR IGNORE INTO item_tags(item_id, tag_id)
+			 SELECT ?,? WHERE EXISTS (SELECT 1 FROM items WHERE id=?)
+			              AND EXISTS (SELECT 1 FROM tags WHERE id=?)`,
+			x.ItemID, x.TagID, x.ItemID, x.TagID,
 		); err != nil {
 			return err
 		}
@@ -128,8 +132,10 @@ func applyChanges(db *sql.DB, req models.SyncRequest, resp *models.SyncResponse)
 
 	for _, x := range req.Changes.ListItemSkippedShops {
 		if _, err := tx.Exec(
-			`INSERT OR IGNORE INTO list_item_skipped_shops(list_item_id, shop_id, skipped_at) VALUES(?,?,?)`,
-			x.ListItemID, x.ShopID, x.SkippedAt,
+			`INSERT OR IGNORE INTO list_item_skipped_shops(list_item_id, shop_id, skipped_at)
+			 SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM list_items WHERE id=?)
+			               AND EXISTS (SELECT 1 FROM shops WHERE id=?)`,
+			x.ListItemID, x.ShopID, x.SkippedAt, x.ListItemID, x.ShopID,
 		); err != nil {
 			return err
 		}
@@ -138,9 +144,12 @@ func applyChanges(db *sql.DB, req models.SyncRequest, resp *models.SyncResponse)
 	for _, ss := range req.Changes.ShoppingSessions {
 		if _, err := tx.Exec(
 			`INSERT INTO shopping_sessions(id, list_id, shop_id, started_at, ended_at, version)
-			 VALUES(?,?,?,?,?,?)
+			 SELECT ?,?,?,?,?,?
+			 WHERE EXISTS (SELECT 1 FROM lists WHERE id=?)
+			   AND EXISTS (SELECT 1 FROM shops WHERE id=?)
 			 ON CONFLICT(id) DO UPDATE SET ended_at=excluded.ended_at, version=excluded.version`,
 			ss.ID, ss.ListID, ss.ShopID, ss.StartedAt, ss.EndedAt, ss.Version,
+			ss.ListID, ss.ShopID,
 		); err != nil {
 			return err
 		}
@@ -149,8 +158,10 @@ func applyChanges(db *sql.DB, req models.SyncRequest, resp *models.SyncResponse)
 	for _, si := range req.Changes.SessionItems {
 		if _, err := tx.Exec(
 			`INSERT OR IGNORE INTO session_items(id, session_id, item_id, action, quantity, unit, at)
-			 VALUES(?,?,?,?,?,?,?)`,
+			 SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM shopping_sessions WHERE id=?)
+			                       AND EXISTS (SELECT 1 FROM items WHERE id=?)`,
 			si.ID, si.SessionID, si.ItemID, si.Action, si.Quantity, si.Unit, si.At,
+			si.SessionID, si.ItemID,
 		); err != nil {
 			return err
 		}

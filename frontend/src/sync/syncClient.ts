@@ -76,12 +76,15 @@ async function collectChanges(): Promise<SyncChanges> {
     lists, listItems, listItemSkippedShops,
     shoppingSessions, sessionItems,
   ] = await Promise.all([
-    db.shops.where('updatedAt').above(lastSyncedAt).toArray(),
-    db.items.where('updatedAt').above(lastSyncedAt).toArray(),
+    // Shops, items, and lists are sent in full every time.
+    // item_shops, list_items, shopping_sessions etc. reference these as FK parents,
+    // so they must always be present on the server regardless of when they were last changed.
+    db.shops.toArray(),
+    db.items.toArray(),
     db.tags.toArray(),
     db.itemShops.toArray(),
     db.itemTags.toArray(),
-    db.lists.where('updatedAt').above(lastSyncedAt).toArray(),
+    db.lists.toArray(),
     db.listItems.where('updatedAt').above(lastSyncedAt).toArray(),
     db.listItemSkippedShops.toArray(),
     db.shoppingSessions.toArray(),
