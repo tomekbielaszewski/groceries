@@ -1,5 +1,3 @@
-Tag should always be written in lowercase and without polish diacritics. If I type mixed case and non english characters - app should automatically lowercase and swap to english characters
-
 In new item dialog - The textfield for adding new tags in new item dialog should also be a tag searchbox. Typing should search tags repository, hitting enter should add new one which is typed in this search field, I can also tap on the dropped down tags which match my search
 
 In new item dialog - Tags listed below the new tag textfield should be sorted by amount of tag usage accross all items. Do not display numbers, just tags, but sort by these numbers

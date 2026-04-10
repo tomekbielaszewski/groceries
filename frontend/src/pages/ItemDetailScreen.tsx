@@ -5,6 +5,7 @@ import { upsertItem, getItemWithDetails } from '../db/queries'
 import type { Shop, Tag, ItemWithDetails, SessionItem } from '../types'
 import ShopDot from '../components/ShopDot'
 import TagBadge from '../components/TagBadge'
+import { normalizeTag } from '../utils/tagUtils'
 
 const COMMON_UNITS = ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'bottle', 'bag', 'box']
 
@@ -93,16 +94,16 @@ const ItemDetailScreen: FC = () => {
   }
 
   const addTag = async () => {
-    const trimmed = newTag.trim()
-    if (!trimmed) return
-    const existing = tags.find(t => t.name.toLowerCase() === trimmed.toLowerCase())
+    const normalized = normalizeTag(newTag)
+    if (!normalized) return
+    const existing = tags.find(t => t.name === normalized)
     let tagId: string
     if (existing) {
       tagId = existing.id
     } else {
       tagId = crypto.randomUUID()
-      await db.tags.add({ id: tagId, name: trimmed })
-      setTags(prev => [...prev, { id: tagId, name: trimmed }])
+      await db.tags.add({ id: tagId, name: normalized })
+      setTags(prev => [...prev, { id: tagId, name: normalized }])
     }
     setSelectedTags(prev => prev.includes(tagId) ? prev : [...prev, tagId])
     setNewTag('')

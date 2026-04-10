@@ -9,6 +9,7 @@ import (
 
 	"grocery/models"
 	gsync "grocery/sync"
+	"grocery/strutil"
 )
 
 func Sync(db *sql.DB) http.HandlerFunc {
@@ -78,7 +79,7 @@ func applyChanges(db *sql.DB, req models.SyncRequest, resp *models.SyncResponse)
 	for _, t := range req.Changes.Tags {
 		if _, err := tx.Exec(
 			`INSERT INTO tags(id, name) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name`,
-			t.ID, t.Name,
+			t.ID, strutil.NormalizeTag(t.Name),
 		); err != nil {
 			return err
 		}

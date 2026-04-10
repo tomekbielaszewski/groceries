@@ -4,6 +4,7 @@ import type {
   List, ListItem, ListItemSkippedShop,
   ShoppingSession, SessionItem,
 } from '../types'
+import { normalizeTag } from '../utils/tagUtils'
 
 export class GroceryDB extends Dexie {
   shops!: Table<Shop, string>
@@ -35,6 +36,44 @@ export class GroceryDB extends Dexie {
       shoppingSessions:       'id, listId, shopId, startedAt',
       sessionItems:           'id, sessionId, itemId, action, at',
       pendingSyncIds:         'id, entity, changedAt',
+    })
+
+    this.version(2).upgrade(async tx => {
+      const tags: Tag[] = await tx.table('tags').toArray()
+
+      // Build a map of normalizedName -> first tag id encountered (the one we keep)
+      const normalizedToKeepId = new Map<string, string>()
+      const idRemap = new Map<string, string>() // mergedId -> keepId
+      const toDelete: string[] = []
+
+      for (const tag of tags) {
+        const normalized = normalizeTag(tag.name)
+        if (normalizedToKeepId.has(normalized)) {
+          // Duplicate after normalization — merge into the first one
+          idRemap.set(tag.id, normalizedToKeepId.get(normalized)!)
+          toDelete.push(tag.id)
+        } else {
+          normalizedToKeepId.set(normalized, tag.id)
+          if (normalized !== tag.name) {
+            await tx.table('tags').update(tag.id, { name: normalized })
+          }
+        }
+      }
+
+      if (idRemap.size > 0) {
+        const itemTags: ItemTag[] = await tx.table('itemTags').toArray()
+        for (const it of itemTags) {
+          if (idRemap.has(it.tagId)) {
+            const newTagId = idRemap.get(it.tagId)!
+            await tx.table('itemTags').delete([it.itemId, it.tagId])
+            const exists = await tx.table('itemTags').get([it.itemId, newTagId])
+            if (!exists) {
+              await tx.table('itemTags').put({ itemId: it.itemId, tagId: newTagId })
+            }
+          }
+        }
+        await tx.table('tags').bulkDelete(toDelete)
+      }
     })
   }
 }
