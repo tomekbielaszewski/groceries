@@ -8,8 +8,15 @@ export async function getItemsWithDetails(searchTerm?: string): Promise<ItemWith
   let items = await db.items.filter(i => !i.deletedAt).toArray()
 
   if (searchTerm) {
-    const lower = searchTerm.toLowerCase()
-    items = items.filter(i => i.name.toLowerCase().includes(lower))
+    // Normalize diacritics: NFD decomposition strips most combining marks,
+    // but ł/Ł don't decompose that way so we replace them explicitly first.
+    const normalize = (s: string) =>
+      s.toLowerCase()
+        .replace(/ł/g, 'l')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    const needle = normalize(searchTerm)
+    items = items.filter(i => normalize(i.name).includes(needle))
   }
 
   return enrichItems(items)

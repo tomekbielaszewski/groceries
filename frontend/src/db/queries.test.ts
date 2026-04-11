@@ -149,6 +149,28 @@ describe('getItemsWithDetails', () => {
     const result = await getItemsWithDetails('xyz')
     expect(result).toEqual([])
   })
+
+  it('getItemsWithDetails_searchFilter matches Polish diacritics with plain ASCII', async () => {
+    await db.items.bulkPut([
+      makeItem('item-1', 'Jabłka'),
+      makeItem('item-2', 'Żółw'),
+      makeItem('item-3', 'Eggs'),
+    ])
+    const result1 = await getItemsWithDetails('jabl')
+    expect(result1).toHaveLength(1)
+    expect(result1[0]!.name).toBe('Jabłka')
+
+    const result2 = await getItemsWithDetails('zolw')
+    expect(result2).toHaveLength(1)
+    expect(result2[0]!.name).toBe('Żółw')
+  })
+
+  it('getItemsWithDetails_searchFilter matches when search term has diacritics and name does not', async () => {
+    await db.items.put(makeItem('item-1', 'Jablka'))
+    const result = await getItemsWithDetails('jabłka')
+    expect(result).toHaveLength(1)
+    expect(result[0]!.name).toBe('Jablka')
+  })
 })
 
 // ── getFrequentItems ───────────────────────────────────────────────────────────
