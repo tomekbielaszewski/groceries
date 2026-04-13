@@ -1,19 +1,20 @@
 # Stage 1: build frontend
-FROM node:22-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: build Go binary (embeds frontend/dist)
-FROM golang:1.26-alpine AS backend
+# Stage 2: build Go binary (always on native builder arch, cross-compile for target)
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS backend
+ARG TARGETARCH
 WORKDIR /app
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
 COPY --from=frontend /app/frontend/dist ./frontend/dist
-RUN go build -o groceries .
+RUN GOARCH=$TARGETARCH go build -o groceries .
 
 # Stage 3: minimal runtime image
 FROM alpine:3.20
