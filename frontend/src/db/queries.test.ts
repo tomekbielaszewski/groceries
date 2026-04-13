@@ -171,6 +171,17 @@ describe('getItemsWithDetails', () => {
     expect(result).toHaveLength(1)
     expect(result[0]!.name).toBe('Jablka')
   })
+
+  it('getItemsWithDetails_searchFilter matches when search term has trailing or leading whitespace', async () => {
+    await db.items.put(makeItem('item-1', 'szczypiorek'))
+    const resultTrailing = await getItemsWithDetails('szczypiorek ')
+    expect(resultTrailing).toHaveLength(1)
+    expect(resultTrailing[0]!.name).toBe('szczypiorek')
+
+    const resultLeading = await getItemsWithDetails(' szczypiorek')
+    expect(resultLeading).toHaveLength(1)
+    expect(resultLeading[0]!.name).toBe('szczypiorek')
+  })
 })
 
 // ── getFrequentItems ───────────────────────────────────────────────────────────

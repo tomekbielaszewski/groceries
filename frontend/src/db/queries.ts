@@ -11,7 +11,7 @@ export async function getItemsWithDetails(searchTerm?: string): Promise<ItemWith
     // Normalize diacritics: NFD decomposition strips most combining marks,
     // but ł/Ł don't decompose that way so we replace them explicitly first.
     const normalize = (s: string) =>
-      s.toLowerCase()
+      s.trim().toLowerCase()
         .replace(/ł/g, 'l')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
