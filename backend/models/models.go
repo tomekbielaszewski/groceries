@@ -15,15 +15,16 @@ type Shop struct {
 }
 
 type Item struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Unit        *string    `json:"unit,omitempty"`
-	Description *string    `json:"description,omitempty"`
-	Notes       *string    `json:"notes,omitempty"`
-	Version     int        `json:"version"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
-	DeletedAt   *time.Time `json:"deletedAt,omitempty"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Unit            *string    `json:"unit,omitempty"`
+	DefaultQuantity *float64   `json:"defaultQuantity,omitempty"`
+	Description     *string    `json:"description,omitempty"`
+	Notes           *string    `json:"notes,omitempty"`
+	Version         int        `json:"version"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+	DeletedAt       *time.Time `json:"deletedAt,omitempty"`
 }
 
 type ItemShop struct {

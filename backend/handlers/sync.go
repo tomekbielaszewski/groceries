@@ -221,9 +221,20 @@ func shopContentEqual(a, b models.Shop) bool {
 	return a.Name == b.Name && a.Color == b.Color && ptrTimeEqual(a.DeletedAt, b.DeletedAt)
 }
 
+func ptrFloat64Equal(a, b *float64) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
 func itemContentEqual(a, b models.Item) bool {
 	return a.Name == b.Name &&
 		ptrStringEqual(a.Unit, b.Unit) &&
+		ptrFloat64Equal(a.DefaultQuantity, b.DefaultQuantity) &&
 		ptrStringEqual(a.Description, b.Description) &&
 		ptrStringEqual(a.Notes, b.Notes) &&
 		ptrTimeEqual(a.DeletedAt, b.DeletedAt)
@@ -294,9 +305,9 @@ func upsertItem(tx *sql.Tx, item models.Item, lastSync time.Time) (applied bool,
 
 	if scanErr == sql.ErrNoRows {
 		_, err = tx.Exec(
-			`INSERT INTO items(id, name, unit, description, notes, version, created_at, updated_at, deleted_at)
-			 VALUES(?,?,?,?,?,?,?,?,?)`,
-			item.ID, item.Name, item.Unit, item.Description, item.Notes,
+			`INSERT INTO items(id, name, unit, default_quantity, description, notes, version, created_at, updated_at, deleted_at)
+			 VALUES(?,?,?,?,?,?,?,?,?,?)`,
+			item.ID, item.Name, item.Unit, item.DefaultQuantity, item.Description, item.Notes,
 			item.Version, item.CreatedAt, item.UpdatedAt, item.DeletedAt,
 		)
 		return err == nil, nil, err
@@ -307,15 +318,33 @@ func upsertItem(tx *sql.Tx, item models.Item, lastSync time.Time) (applied bool,
 
 	if gsync.IsConflict(item.UpdatedAt, dbUpdatedAt, lastSync) {
 		var dbItem models.Item
-		if e := tx.QueryRow(`SELECT id, name, unit, description, notes, version, created_at, updated_at, deleted_at FROM items WHERE id=?`, item.ID).
-			Scan(&dbItem.ID, &dbItem.Name, &dbItem.Unit, &dbItem.Description, &dbItem.Notes, &dbItem.Version, &dbItem.CreatedAt, &dbItem.UpdatedAt, &dbItem.DeletedAt); e != nil {
+		var dbUnit, dbDescription, dbNotes sql.NullString
+		var dbDefaultQuantity sql.NullFloat64
+		var dbDeletedAt sql.NullTime
+		if e := tx.QueryRow(`SELECT id, name, unit, default_quantity, description, notes, version, created_at, updated_at, deleted_at FROM items WHERE id=?`, item.ID).
+			Scan(&dbItem.ID, &dbItem.Name, &dbUnit, &dbDefaultQuantity, &dbDescription, &dbNotes, &dbItem.Version, &dbItem.CreatedAt, &dbItem.UpdatedAt, &dbDeletedAt); e != nil {
 			return false, nil, e
+		}
+		if dbUnit.Valid {
+			dbItem.Unit = &dbUnit.String
+		}
+		if dbDefaultQuantity.Valid {
+			dbItem.DefaultQuantity = &dbDefaultQuantity.Float64
+		}
+		if dbDescription.Valid {
+			dbItem.Description = &dbDescription.String
+		}
+		if dbNotes.Valid {
+			dbItem.Notes = &dbNotes.String
+		}
+		if dbDeletedAt.Valid {
+			dbItem.DeletedAt = &dbDeletedAt.Time
 		}
 		if itemContentEqual(item, dbItem) {
 			if item.UpdatedAt.After(dbUpdatedAt) {
 				_, err = tx.Exec(
-					`UPDATE items SET name=?, unit=?, description=?, notes=?, version=?, updated_at=?, deleted_at=? WHERE id=?`,
-					item.Name, item.Unit, item.Description, item.Notes,
+					`UPDATE items SET name=?, unit=?, default_quantity=?, description=?, notes=?, version=?, updated_at=?, deleted_at=? WHERE id=?`,
+					item.Name, item.Unit, item.DefaultQuantity, item.Description, item.Notes,
 					item.Version, item.UpdatedAt, item.DeletedAt, item.ID,
 				)
 				return err == nil, nil, err
@@ -328,8 +357,8 @@ func upsertItem(tx *sql.Tx, item models.Item, lastSync time.Time) (applied bool,
 
 	if item.UpdatedAt.After(dbUpdatedAt) {
 		_, err = tx.Exec(
-			`UPDATE items SET name=?, unit=?, description=?, notes=?, version=?, updated_at=?, deleted_at=? WHERE id=?`,
-			item.Name, item.Unit, item.Description, item.Notes,
+			`UPDATE items SET name=?, unit=?, default_quantity=?, description=?, notes=?, version=?, updated_at=?, deleted_at=? WHERE id=?`,
+			item.Name, item.Unit, item.DefaultQuantity, item.Description, item.Notes,
 			item.Version, item.UpdatedAt, item.DeletedAt, item.ID,
 		)
 		return err == nil, nil, err
@@ -392,7 +421,7 @@ func upsertListItem(tx *sql.Tx, li models.ListItem, lastSync time.Time) (applied
 
 	if scanErr == sql.ErrNoRows {
 		_, err = tx.Exec(
-			`INSERT INTO list_items(id, list_id, item_id, state, quantity, unit, notes, version, added_at, updated_at)
+			`INSERT OR IGNORE INTO list_items(id, list_id, item_id, state, quantity, unit, notes, version, added_at, updated_at)
 			 VALUES(?,?,?,?,?,?,?,?,?,?)`,
 			li.ID, li.ListID, li.ItemID, li.State, li.Quantity, li.Unit, li.Notes,
 			li.Version, li.AddedAt, li.UpdatedAt,

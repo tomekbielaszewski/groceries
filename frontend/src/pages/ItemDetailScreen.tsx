@@ -9,6 +9,10 @@ import { normalizeTag } from '../utils/tagUtils'
 
 const COMMON_UNITS = ['kg', 'g', 'l', 'ml', 'pcs', 'pack', 'bottle', 'bag', 'box']
 
+function defaultQtyForUnit(unit: string): number {
+  return (unit === 'g' || unit === 'ml') ? 100 : 1
+}
+
 const ItemDetailScreen: FC = () => {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
@@ -17,6 +21,7 @@ const ItemDetailScreen: FC = () => {
 
   const [name, setName]             = useState(searchParams.get('name') ?? '')
   const [unit, setUnit]             = useState(isNew ? 'pcs' : '')
+  const [defaultQuantity, setDefaultQuantity] = useState(isNew ? 1 : 1)
   const [description, setDescription] = useState('')
   const [notes, setNotes]           = useState('')
   const [selectedShops, setSelectedShops] = useState<string[]>([])
@@ -37,6 +42,7 @@ const ItemDetailScreen: FC = () => {
         setItem(enriched)
         setName(enriched.name)
         setUnit(enriched.unit ?? '')
+        setDefaultQuantity(enriched.defaultQuantity ?? defaultQtyForUnit(enriched.unit ?? ''))
         setDescription(enriched.description ?? '')
         setNotes(enriched.notes ?? '')
         setSelectedShops(enriched.shops.map(s => s.id))
@@ -48,6 +54,11 @@ const ItemDetailScreen: FC = () => {
     }
   }, [id, isNew])
 
+  const changeUnit = (newUnit: string) => {
+    setUnit(newUnit)
+    if (isNew) setDefaultQuantity(defaultQtyForUnit(newUnit))
+  }
+
   const save = async () => {
     if (!name.trim()) return
     const now = new Date().toISOString()
@@ -58,6 +69,7 @@ const ItemDetailScreen: FC = () => {
         id: itemId,
         name: name.trim(),
         unit: unit || undefined,
+        defaultQuantity,
         description: description || undefined,
         notes: notes || undefined,
         version: item ? item.version + 1 : 1,
@@ -76,6 +88,8 @@ const ItemDetailScreen: FC = () => {
         listId,
         itemId,
         state: 'active',
+        quantity: defaultQuantity,
+        unit: unit || undefined,
         version: 1,
         addedAt: now,
         updatedAt: now,
@@ -151,7 +165,7 @@ const ItemDetailScreen: FC = () => {
             {COMMON_UNITS.map(u => (
               <button
                 key={u}
-                onClick={() => setUnit(unit === u ? '' : u)}
+                onClick={() => changeUnit(unit === u ? '' : u)}
                 className={`text-xs px-2 py-0.5 rounded border transition-colors ${unit === u ? 'border-blue-500 text-blue-400' : 'border-border text-gray-400 hover:border-gray-500'}`}
               >
                 {u}
@@ -160,8 +174,20 @@ const ItemDetailScreen: FC = () => {
           </div>
           <input
             value={unit}
-            onChange={e => setUnit(e.target.value)}
+            onChange={e => changeUnit(e.target.value)}
             placeholder="or type custom…"
+            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+
+        {/* Default amount */}
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Default amount</label>
+          <input
+            type="number"
+            min={1}
+            value={defaultQuantity}
+            onChange={e => setDefaultQuantity(Math.max(1, Number(e.target.value) || 1))}
             className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>

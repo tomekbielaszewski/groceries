@@ -11,6 +11,7 @@ export interface Item {
   id: string
   name: string
   unit?: string
+  defaultQuantity?: number
   description?: string
   notes?: string
   version: number

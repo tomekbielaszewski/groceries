@@ -650,3 +650,93 @@ func TestSync_SkippedShops(t *testing.T) {
 	assert.Equal(t, "sk-li-1", br.ListItemSkippedShops[0].ListItemID)
 	assert.Equal(t, "sk-shop-1", br.ListItemSkippedShops[0].ShopID)
 }
+
+// ---------------------------------------------------------------------------
+// TestSync_ListItem_DuplicateItemIgnored
+// ---------------------------------------------------------------------------
+
+// TestSync_ListItem_DuplicateItemIgnored reproduces the 500 error that occurred
+// when the client sent two list-item rows referencing the same (list_id, item_id)
+// pair but with different primary-key IDs.  The server must accept the first and
+// silently ignore the second rather than failing with a UNIQUE constraint error.
+func TestSync_ListItem_DuplicateItemIgnored(t *testing.T) {
+	database := newTestDB(t)
+	srv := newTestServer(t, database)
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	lastSync := now.Add(-time.Hour)
+
+	item := models.Item{ID: "dup-item-1", Name: "Gruszki", Version: 1, CreatedAt: now, UpdatedAt: now}
+	list := models.List{ID: "dup-list-1", Name: "Weekly", Version: 1, CreatedAt: now, UpdatedAt: now}
+
+	// First sync: add the item + list + first list-item row.
+	li1 := models.ListItem{
+		ID: "dup-li-1", ListID: "dup-list-1", ItemID: "dup-item-1",
+		State: "active", Version: 1, AddedAt: now, UpdatedAt: now,
+	}
+	changes := emptyChanges()
+	changes.Items = []models.Item{item}
+	changes.Lists = []models.List{list}
+	changes.ListItems = []models.ListItem{li1}
+	resp := doSync(t, srv, syncRequest(lastSync, changes))
+	require.Contains(t, resp.Applied, "dup-li-1", "first list-item must be applied")
+
+	// Second sync: same (list_id, item_id) but a *different* list-item ID.
+	// This simulates a race condition where the client created a duplicate row
+	// locally (e.g. addItem called twice before listItems state loaded).
+	li2 := models.ListItem{
+		ID: "dup-li-2", ListID: "dup-list-1", ItemID: "dup-item-1",
+		State: "active", Version: 1, AddedAt: now, UpdatedAt: now.Add(time.Millisecond),
+	}
+	changes2 := emptyChanges()
+	changes2.Items = []models.Item{item}
+	changes2.Lists = []models.List{list}
+	changes2.ListItems = []models.ListItem{li2}
+	resp2 := doSync(t, srv, syncRequest(lastSync, changes2))
+
+	// Must succeed — no 500 from UNIQUE constraint.
+	assert.Empty(t, resp2.Conflicts, "duplicate list-item must not produce a conflict")
+
+	// The original row must still be stored.
+	br := doBootstrap(t, srv)
+	listItemIDs := make([]string, 0, len(br.ListItems))
+	for _, li := range br.ListItems {
+		listItemIDs = append(listItemIDs, li.ID)
+	}
+	assert.Contains(t, listItemIDs, "dup-li-1", "original list-item must be preserved")
+}
+
+// ---------------------------------------------------------------------------
+// TestSync_Item_DefaultQuantityRoundTrip
+// ---------------------------------------------------------------------------
+
+// TestSync_Item_DefaultQuantityRoundTrip ensures that an item's defaultQuantity
+// is stored on the server and returned correctly via bootstrap.
+func TestSync_Item_DefaultQuantityRoundTrip(t *testing.T) {
+	database := newTestDB(t)
+	srv := newTestServer(t, database)
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	unit := "kg"
+	dq := 2.5
+
+	item := models.Item{
+		ID:              "dq-item-1",
+		Name:            "Apples",
+		Unit:            &unit,
+		DefaultQuantity: &dq,
+		Version:         1,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+
+	changes := emptyChanges()
+	changes.Items = []models.Item{item}
+	resp := doSync(t, srv, syncRequest(now.Add(-time.Hour), changes))
+	require.Contains(t, resp.Applied, "dq-item-1")
+
+	br := doBootstrap(t, srv)
+	require.Len(t, br.Items, 1)
+	require.NotNil(t, br.Items[0].DefaultQuantity, "defaultQuantity must be stored and returned")
+	assert.Equal(t, 2.5, *br.Items[0].DefaultQuantity)
+}

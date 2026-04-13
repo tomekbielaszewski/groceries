@@ -45,11 +45,14 @@ const ListScreen: FC = () => {
       return
     }
     const now = new Date().toISOString()
+    const defaultQty = item.defaultQuantity ?? (item.unit === 'g' || item.unit === 'ml' ? 100 : 1)
     await upsertListItem({
       id: crypto.randomUUID(),
       listId: id,
       itemId: item.id,
       state: 'active',
+      quantity: defaultQty,
+      unit: item.unit,
       version: 1,
       addedAt: now,
       updatedAt: now,

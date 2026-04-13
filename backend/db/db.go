@@ -71,6 +71,11 @@ func migrate(db *sql.DB) error {
 		return fmt.Errorf("migrate bug_reports.resolved_at: %w", err)
 	}
 
+	_, err = db.Exec(`ALTER TABLE items ADD COLUMN default_quantity REAL`)
+	if err != nil && !isDuplicateColumnError(err) {
+		return fmt.Errorf("migrate items.default_quantity: %w", err)
+	}
+
 	if err := normalizeExistingTags(db); err != nil {
 		return fmt.Errorf("migrate normalize tags: %w", err)
 	}

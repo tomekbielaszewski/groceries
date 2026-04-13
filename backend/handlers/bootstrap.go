@@ -113,7 +113,7 @@ func queryShops(db *sql.DB, since string) ([]models.Shop, error) {
 }
 
 func queryItems(db *sql.DB, since string) ([]models.Item, error) {
-	q := `SELECT id, name, unit, description, notes, version, created_at, updated_at, deleted_at FROM items`
+	q := `SELECT id, name, unit, default_quantity, description, notes, version, created_at, updated_at, deleted_at FROM items`
 	args := []any{}
 	if since != "" {
 		q += ` WHERE updated_at > ?`
@@ -129,13 +129,17 @@ func queryItems(db *sql.DB, since string) ([]models.Item, error) {
 	for rows.Next() {
 		var item models.Item
 		var unit, description, notes sql.NullString
+		var defaultQuantity sql.NullFloat64
 		var deletedAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.Name, &unit, &description, &notes,
+		if err := rows.Scan(&item.ID, &item.Name, &unit, &defaultQuantity, &description, &notes,
 			&item.Version, &item.CreatedAt, &item.UpdatedAt, &deletedAt); err != nil {
 			return nil, err
 		}
 		if unit.Valid {
 			item.Unit = &unit.String
+		}
+		if defaultQuantity.Valid {
+			item.DefaultQuantity = &defaultQuantity.Float64
 		}
 		if description.Valid {
 			item.Description = &description.String
