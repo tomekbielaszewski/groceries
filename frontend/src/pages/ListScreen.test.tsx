@@ -148,6 +148,32 @@ describe('ListScreen — quantity default when adding via search', () => {
     })
   })
 
+  it('removed item re-appears in suggestions panel', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    const item = makeItem('i1', { name: 'Butter' })
+    const li = makeListItem('li1', 'l1', 'i1')
+    await db.lists.add(list)
+    await db.items.add(item)
+    await db.listItems.add(li)
+
+    renderList('l1')
+
+    // The item is active — wait for render and verify no suggestion pill for Butter
+    await screen.findByText('Butter')
+    // SuggestionsPanel filters out active items, so no pill button for Butter yet
+    expect(screen.queryByRole('button', { name: /^Butter/ })).toBeNull()
+
+    // Remove Butter from the list
+    const removeBtn = screen.getByRole('button', { name: /remove from list/i })
+    await user.click(removeBtn)
+
+    // After removal, Butter should re-appear as a suggestion pill
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^Butter/ })).toBeTruthy()
+    })
+  })
+
   it('does not create duplicate listItem when addItem is called while listItems state is loading', async () => {
     const user = userEvent.setup()
     const list = makeList('l1')

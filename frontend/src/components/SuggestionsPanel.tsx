@@ -4,15 +4,16 @@ import type { ItemWithDetails } from '../types'
 
 interface SuggestionsPanelProps {
   listId: string
+  refresh?: number
   onAdd: (item: ItemWithDetails) => void
 }
 
-const SuggestionsPanel: FC<SuggestionsPanelProps> = ({ listId, onAdd }) => {
+const SuggestionsPanel: FC<SuggestionsPanelProps> = ({ listId, refresh, onAdd }) => {
   const [items, setItems] = useState<ItemWithDetails[]>([])
 
   useEffect(() => {
     getFrequentItems(listId, 20).then(setItems)
-  }, [listId])
+  }, [listId, refresh])
 
   if (items.length === 0) return null
 

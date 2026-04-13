@@ -220,7 +220,7 @@ const ListScreen: FC = () => {
 
       {!isShoppingMode && (
         <div className="border-t border-border px-3 pt-2 pb-3 space-y-2">
-          {id && <SuggestionsPanel listId={id} onAdd={addItem} />}
+          {id && <SuggestionsPanel listId={id} refresh={refresh} onAdd={addItem} />}
           <SearchInput
             dropUp
             onSelect={addItem}
