@@ -76,3 +76,54 @@ describe('SearchInput — Enter key behaviour', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 })
+
+describe('SearchInput — duplicate prevention when item is excluded (already on list)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getItemsWithDetails).mockResolvedValue([makeItem({ id: 'ketchup-id', name: 'Ketchup' })])
+  })
+
+  it('does not show "+ Add" when an item with that exact name exists but is excluded', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    const onCreateNew = vi.fn()
+
+    render(
+      <SearchInput
+        onSelect={onSelect}
+        onCreateNew={onCreateNew}
+        excludeIds={new Set(['ketchup-id'])}
+      />
+    )
+
+    const input = screen.getByPlaceholderText('Search items…')
+    await user.type(input, 'Ketchup')
+
+    // Wait for the debounce to fire, then verify no duplicate button appears
+    await waitFor(() => expect(vi.mocked(getItemsWithDetails)).toHaveBeenCalled())
+    expect(screen.queryByText('+ Add "Ketchup"')).not.toBeInTheDocument()
+    expect(onCreateNew).not.toHaveBeenCalled()
+  })
+
+  it('does not trigger onCreateNew on Enter when excluded item has exact name match', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    const onCreateNew = vi.fn()
+
+    render(
+      <SearchInput
+        onSelect={onSelect}
+        onCreateNew={onCreateNew}
+        excludeIds={new Set(['ketchup-id'])}
+      />
+    )
+
+    const input = screen.getByPlaceholderText('Search items…')
+    await user.type(input, 'Ketchup')
+    // Wait for the debounce to fire and React to re-render with allResults populated
+    await waitFor(() => expect(vi.mocked(getItemsWithDetails)).toHaveBeenCalled())
+    await user.keyboard('{Enter}')
+
+    expect(onCreateNew).not.toHaveBeenCalled()
+  })
+})

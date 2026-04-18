@@ -14,16 +14,18 @@ interface SearchInputProps {
 const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', onSelect, onCreateNew, excludeIds, dropUp }) => {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ItemWithDetails[]>([])
+  const [allResults, setAllResults] = useState<ItemWithDetails[]>([])
   const [open, setOpen] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current)
-    if (!query.trim()) { setResults([]); setOpen(false); return }
+    if (!query.trim()) { setResults([]); setAllResults([]); setOpen(false); return }
 
     timer.current = setTimeout(async () => {
       const items = await getItemsWithDetails(query)
+      setAllResults(items)
       const filtered = excludeIds ? items.filter(i => !excludeIds.has(i.id)) : items
       setResults(filtered.slice(0, 8))
       setOpen(true)
@@ -39,7 +41,8 @@ const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', on
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const exactMatch = results.some(r => r.name.toLowerCase() === query.toLowerCase())
+  // Check all catalogue items (including excluded ones) to prevent duplicate creation
+  const exactMatch = allResults.some(r => r.name.toLowerCase() === query.toLowerCase())
 
   return (
     <div ref={ref} className="relative">
@@ -51,7 +54,7 @@ const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', on
           if (e.key === 'Enter' && query.trim()) {
             if (results.length > 0) {
               onSelect(results[0])
-            } else {
+            } else if (!exactMatch) {
               onCreateNew(query.trim())
             }
             setQuery('')
