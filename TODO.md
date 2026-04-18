@@ -11,7 +11,7 @@ moved out of the view.
 
 create prometheus metrics endpoint containing: processing time per endpoint, amount of bytes sent, errors and success requests, golang metrics like memory, cpu etc. Anything what I have missed?
 
-When I edit an item and I need to change a default unit amount from for example 100g to 500g I cannot remove the number completely. Form does not allow to remove last 1. I have to change 100 to 1500 and then move the cursor and remove 1 leaving me with 500 in the amount field. Let me edit this field freely, the validation should be on saving the item, not when actively editing it.
+    When I edit an item and I need to change a default unit amount from for example 100g to 500g I cannot remove the number completely. Form does not allow to remove last 1. I have to change 100 to 1500 and then move the cursor and remove 1 leaving me with 500 in the amount field. Let me edit this field freely, the validation should be on saving the item, not when actively editing it.
 
 When I add items to the shopping list and I enter edit item dialog, then edit the default unit of that item (changed from kilograms to grams) and I save that item the shopping list still have the old unit displayed. I have to remove that item and add it again
 

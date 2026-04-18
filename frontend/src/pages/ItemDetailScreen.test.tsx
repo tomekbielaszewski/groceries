@@ -162,6 +162,102 @@ describe('ItemDetailScreen — tag filtering', () => {
 })
 
 // ---------------------------------------------------------------------------
+// default amount field — free editing
+// ---------------------------------------------------------------------------
+
+describe('ItemDetailScreen — default amount field', () => {
+  it('allows the field to be fully cleared while typing', async () => {
+    const user = userEvent.setup()
+    renderNewItem()
+
+    const amountInput = await screen.findByDisplayValue('1')
+    await user.tripleClick(amountInput)
+    await user.keyboard('{Backspace}')
+
+    // After clearing, the field should be empty (not snapped back to 1)
+    expect(amountInput).toHaveValue('')
+  })
+
+  it('shows no error when the field is empty', async () => {
+    const user = userEvent.setup()
+    renderNewItem()
+
+    const amountInput = await screen.findByDisplayValue('1')
+    await user.tripleClick(amountInput)
+    await user.keyboard('{Backspace}')
+
+    expect(screen.queryByText(/must be greater than/i)).not.toBeInTheDocument()
+  })
+
+  it('shows an error when the value is zero', async () => {
+    const user = userEvent.setup()
+    renderNewItem()
+
+    const amountInput = await screen.findByDisplayValue('1')
+    await user.clear(amountInput)
+    await user.type(amountInput, '0')
+
+    expect(await screen.findByText(/must be greater than/i)).toBeInTheDocument()
+  })
+
+  it('shows an error when the value is negative', async () => {
+    const user = userEvent.setup()
+    renderNewItem()
+
+    const amountInput = await screen.findByDisplayValue('1')
+    await user.clear(amountInput)
+    await user.type(amountInput, '-3')
+
+    expect(await screen.findByText(/must be greater than/i)).toBeInTheDocument()
+  })
+
+  it('disables the save button when the amount is invalid', async () => {
+    const user = userEvent.setup()
+    renderNewItem()
+
+    // Fill in name and unit so the button would otherwise be enabled
+    await user.type(await screen.findByPlaceholderText('e.g. Whole milk'), 'Milk')
+    // unit defaults to 'pcs' for new items, so button should now be enabled
+    const saveButton = screen.getByRole('button', { name: /add item/i })
+    expect(saveButton).not.toBeDisabled()
+
+    // Now set an invalid amount
+    const amountInput = screen.getByDisplayValue('1')
+    await user.clear(amountInput)
+    await user.type(amountInput, '0')
+
+    expect(saveButton).toBeDisabled()
+  })
+
+  it('shows a "not a valid number" error when non-numeric characters are typed', async () => {
+    const user = userEvent.setup()
+    renderNewItem()
+
+    const amountInput = await screen.findByDisplayValue('1')
+    await user.clear(amountInput)
+    await user.type(amountInput, 'abc')
+
+    expect(await screen.findByText(/not a valid number/i)).toBeInTheDocument()
+    expect(screen.queryByText(/must be greater than/i)).not.toBeInTheDocument()
+  })
+
+  it('clears the error when a valid value is typed', async () => {
+    const user = userEvent.setup()
+    renderNewItem()
+
+    const amountInput = await screen.findByDisplayValue('1')
+    await user.clear(amountInput)
+    await user.type(amountInput, '0')
+    await screen.findByText(/must be greater than/i)
+
+    await user.clear(amountInput)
+    await user.type(amountInput, '5')
+
+    expect(screen.queryByText(/must be greater than/i)).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // purchase history table
 // ---------------------------------------------------------------------------
 

@@ -21,7 +21,7 @@ const ItemDetailScreen: FC = () => {
 
   const [name, setName]             = useState(searchParams.get('name') ?? '')
   const [unit, setUnit]             = useState(isNew ? 'pcs' : '')
-  const [defaultQuantity, setDefaultQuantity] = useState(isNew ? 1 : 1)
+  const [defaultQuantity, setDefaultQuantity] = useState(isNew ? '1' : '1')
   const [description, setDescription] = useState('')
   const [notes, setNotes]           = useState('')
   const [selectedShops, setSelectedShops] = useState<string[]>([])
@@ -43,7 +43,7 @@ const ItemDetailScreen: FC = () => {
         setItem(enriched)
         setName(enriched.name)
         setUnit(enriched.unit ?? '')
-        setDefaultQuantity(enriched.defaultQuantity ?? defaultQtyForUnit(enriched.unit ?? ''))
+        setDefaultQuantity(String(enriched.defaultQuantity ?? defaultQtyForUnit(enriched.unit ?? '')))
         setDescription(enriched.description ?? '')
         setNotes(enriched.notes ?? '')
         setSelectedShops(enriched.shops.map(s => s.id))
@@ -66,20 +66,21 @@ const ItemDetailScreen: FC = () => {
 
   const changeUnit = (newUnit: string) => {
     setUnit(newUnit)
-    if (isNew) setDefaultQuantity(defaultQtyForUnit(newUnit))
+    if (isNew) setDefaultQuantity(String(defaultQtyForUnit(newUnit)))
   }
 
   const save = async () => {
     if (!name.trim()) return
     const now = new Date().toISOString()
     const itemId = isNew ? crypto.randomUUID() : id!
+    const parsedQty = Math.max(1, Number(defaultQuantity) || 1)
 
     await upsertItem(
       {
         id: itemId,
         name: name.trim(),
         unit: unit || undefined,
-        defaultQuantity,
+        defaultQuantity: parsedQty,
         description: description || undefined,
         notes: notes || undefined,
         version: item ? item.version + 1 : 1,
@@ -98,7 +99,7 @@ const ItemDetailScreen: FC = () => {
         listId,
         itemId,
         state: 'active',
-        quantity: defaultQuantity,
+        quantity: parsedQty,
         unit: unit || undefined,
         version: 1,
         addedAt: now,
@@ -132,6 +133,10 @@ const ItemDetailScreen: FC = () => {
     setSelectedTags(prev => prev.includes(tagId) ? prev : [...prev, tagId])
     setNewTag('')
   }
+
+  const qtyNaN = defaultQuantity !== '' && isNaN(Number(defaultQuantity))
+  const qtyTooLow = defaultQuantity !== '' && !qtyNaN && Number(defaultQuantity) <= 0
+  const qtyInvalid = qtyNaN || qtyTooLow
 
   const shopMap = new Map(shops.map(s => [s.id, s]))
   const tagMap  = new Map(tags.map(t => [t.id, t]))
@@ -194,12 +199,14 @@ const ItemDetailScreen: FC = () => {
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Default amount</label>
           <input
-            type="number"
-            min={1}
+            type="text"
+            inputMode="numeric"
             value={defaultQuantity}
-            onChange={e => setDefaultQuantity(Math.max(1, Number(e.target.value) || 1))}
-            className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+            onChange={e => setDefaultQuantity(e.target.value)}
+            className={`w-full bg-card border rounded px-2.5 py-1.5 text-sm focus:outline-none transition-colors ${qtyInvalid ? 'border-red-500 focus:border-red-500' : 'border-border focus:border-blue-500'}`}
           />
+          {qtyNaN && <p className="text-xs text-red-400 mt-1">Not a valid number</p>}
+          {qtyTooLow && <p className="text-xs text-red-400 mt-1">Must be greater than 0</p>}
         </div>
 
         {/* Shops */}
@@ -344,7 +351,7 @@ const ItemDetailScreen: FC = () => {
       <div className="px-3 py-3 border-t border-border">
         <button
           onClick={() => void save()}
-          disabled={!name.trim() || (isNew && !unit.trim())}
+          disabled={!name.trim() || (isNew && !unit.trim()) || qtyInvalid}
           className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
         >
           {isNew ? 'Add item' : 'Save changes'}
