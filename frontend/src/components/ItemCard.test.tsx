@@ -96,7 +96,7 @@ describe('ItemCard — repository mode', () => {
 describe('ItemCard — browse mode', () => {
   it('renders item name', () => {
     render(
-      <ItemCard mode="browse" listItem={makeListItem()} shops={shops} onToggle={() => {}} onRemove={() => {}} onQuantityChange={() => {}} />
+      <ItemCard mode="browse" listItem={makeListItem()} shops={shops} onRemove={() => {}} onQuantityChange={() => {}} />
     )
     expect(screen.getByText('Whole Milk')).toBeInTheDocument()
   })
@@ -120,7 +120,7 @@ describe('ItemCard — browse mode', () => {
 
   it('renders faded name when state is bought', () => {
     render(
-      <ItemCard mode="browse" listItem={makeListItem({ state: 'bought' })} shops={shops} onToggle={() => {}} onRemove={() => {}} onQuantityChange={() => {}} />
+      <ItemCard mode="browse" listItem={makeListItem({ state: 'bought' })} shops={shops} onRemove={() => {}} onQuantityChange={() => {}} />
     )
     const nameEl = screen.getByText('Whole Milk')
     expect(nameEl).not.toHaveClass('line-through')
@@ -129,7 +129,7 @@ describe('ItemCard — browse mode', () => {
 
   it('name is not faded when state is active', () => {
     render(
-      <ItemCard mode="browse" listItem={makeListItem({ state: 'active' })} shops={shops} onToggle={() => {}} onRemove={() => {}} onQuantityChange={() => {}} />
+      <ItemCard mode="browse" listItem={makeListItem({ state: 'active' })} shops={shops} onRemove={() => {}} onQuantityChange={() => {}} />
     )
     const nameEl = screen.getByText('Whole Milk')
     expect(nameEl).not.toHaveClass('line-through')
@@ -139,7 +139,7 @@ describe('ItemCard — browse mode', () => {
     const user = userEvent.setup()
     const onRemove = vi.fn()
     render(
-      <ItemCard mode="browse" listItem={makeListItem()} shops={shops} onToggle={() => {}} onRemove={onRemove} onQuantityChange={() => {}} />
+      <ItemCard mode="browse" listItem={makeListItem()} shops={shops} onRemove={onRemove} onQuantityChange={() => {}} />
     )
     await user.click(screen.getByRole('button', { name: 'Remove from list' }))
     expect(onRemove).toHaveBeenCalledOnce()
@@ -155,7 +155,7 @@ describe('ItemCard — browse mode', () => {
     const listItem = makeListItem({ item, skippedShopIds: ['shop-1'] })
 
     const { container } = render(
-      <ItemCard mode="browse" listItem={listItem} shops={shops} onToggle={() => {}} onRemove={() => {}} onQuantityChange={() => {}} />
+      <ItemCard mode="browse" listItem={listItem} shops={shops} onRemove={() => {}} onQuantityChange={() => {}} />
     )
 
     // shop-1 is skipped: should have opacity 0.4 and no background color
