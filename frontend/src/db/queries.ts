@@ -4,6 +4,39 @@ import type {
   List, ListItem, Shop, Tag, SessionItem,
 } from '../types'
 
+export async function cloneList(list: List, listItems: ListItem[]): Promise<string> {
+  const now = new Date().toISOString()
+  const newListId = crypto.randomUUID()
+  const newList: List = {
+    id: newListId,
+    name: `Copy of ${list.name}`,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+  }
+  const newListItems: ListItem[] = listItems.map(li => ({
+    id: crypto.randomUUID(),
+    listId: newListId,
+    itemId: li.itemId,
+    state: 'active' as const,
+    quantity: li.quantity,
+    unit: li.unit,
+    notes: li.notes,
+    version: 1,
+    addedAt: now,
+    updatedAt: now,
+  }))
+  await db.transaction('rw', [db.lists, db.listItems, db.pendingSyncIds], async () => {
+    await db.lists.put(newList)
+    await db.pendingSyncIds.put({ id: newListId, entity: 'list', changedAt: now })
+    for (const li of newListItems) {
+      await db.listItems.put(li)
+      await db.pendingSyncIds.put({ id: li.id, entity: 'listItem', changedAt: now })
+    }
+  })
+  return newListId
+}
+
 export async function getItemsWithDetails(searchTerm?: string): Promise<ItemWithDetails[]> {
   let items = await db.items.filter(i => !i.deletedAt).toArray()
 

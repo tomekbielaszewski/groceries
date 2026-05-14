@@ -1,7 +1,7 @@
 import { type FC, useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { db } from '../db/schema'
-import { getListItemsWithItems, upsertList, upsertListItem, skipShopForListItem, clearSkipForListItem, recordSessionItem } from '../db/queries'
+import { getListItemsWithItems, upsertList, upsertListItem, skipShopForListItem, clearSkipForListItem, recordSessionItem, cloneList } from '../db/queries'
 import { useStore } from '../store/useStore'
 import type { List, ListItemWithItem, ItemWithDetails, Shop, SortMode } from '../types'
 import ItemCard from '../components/ItemCard'
@@ -67,6 +67,13 @@ const ListScreen: FC = () => {
     setMenuOpen(false)
     exitShoppingMode()
     navigate('/')
+  }
+
+  const handleCloneList = async () => {
+    if (!list) return
+    setMenuOpen(false)
+    const newId = await cloneList(list, listItems)
+    navigate(`/list/${newId}`)
   }
 
   useEffect(() => {
@@ -215,6 +222,12 @@ const ListScreen: FC = () => {
                         Rename list
                       </button>
                     )}
+                    <button
+                      onClick={() => void handleCloneList()}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+                    >
+                      Clone list
+                    </button>
                     <button
                       onClick={() => void toggleArchive()}
                       className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
