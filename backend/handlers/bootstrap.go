@@ -207,7 +207,7 @@ func queryItemTags(db *sql.DB) ([]models.ItemTag, error) {
 }
 
 func queryLists(db *sql.DB, since string) ([]models.List, error) {
-	q := `SELECT id, name, version, created_at, updated_at, deleted_at FROM lists`
+	q := `SELECT id, name, version, created_at, updated_at, deleted_at, archived_at FROM lists`
 	args := []any{}
 	if since != "" {
 		q += ` WHERE updated_at > ?`
@@ -222,11 +222,15 @@ func queryLists(db *sql.DB, since string) ([]models.List, error) {
 	for rows.Next() {
 		var l models.List
 		var deletedAt sql.NullTime
-		if err := rows.Scan(&l.ID, &l.Name, &l.Version, &l.CreatedAt, &l.UpdatedAt, &deletedAt); err != nil {
+		var archivedAt sql.NullTime
+		if err := rows.Scan(&l.ID, &l.Name, &l.Version, &l.CreatedAt, &l.UpdatedAt, &deletedAt, &archivedAt); err != nil {
 			return nil, err
 		}
 		if deletedAt.Valid {
 			l.DeletedAt = &deletedAt.Time
+		}
+		if archivedAt.Valid {
+			l.ArchivedAt = &archivedAt.Time
 		}
 		result = append(result, l)
 	}

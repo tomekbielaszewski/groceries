@@ -1,6 +1,7 @@
 import { type FC, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../db/schema'
+import { upsertList } from '../db/queries'
 import type { List } from '../types'
 
 const ListsScreen: FC = () => {
@@ -10,29 +11,40 @@ const ListsScreen: FC = () => {
   const navigate = useNavigate()
 
   const load = () =>
-    db.lists.filter(l => !l.deletedAt).sortBy('createdAt').then(ls => setLists([...ls].reverse()))
+    db.lists.filter(l => !l.deletedAt).sortBy('createdAt').then(ls => {
+      const sorted = [...ls].reverse()
+      const active = sorted.filter(l => !l.archivedAt)
+      const archived = sorted.filter(l => !!l.archivedAt)
+      setLists([...active, ...archived])
+    })
 
   useEffect(() => { void load() }, [])
 
   const createList = async () => {
     if (!newName.trim()) return
     const now = new Date().toISOString()
-    await db.lists.add({
+    const list: List = {
       id: crypto.randomUUID(),
       name: newName.trim(),
       version: 1,
       createdAt: now,
       updatedAt: now,
-    })
+    }
+    await upsertList(list)
     setNewName('')
     setCreating(false)
     void load()
   }
 
   const deleteList = async (id: string) => {
-    await db.lists.update(id, { deletedAt: new Date().toISOString() })
+    const list = await db.lists.get(id)
+    if (!list) return
+    await upsertList({ ...list, deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), version: list.version + 1 })
     void load()
   }
+
+  const activeLists = lists.filter(l => !l.archivedAt)
+  const archivedLists = lists.filter(l => !!l.archivedAt)
 
   return (
     <div className="flex flex-col h-full">
@@ -47,9 +59,30 @@ const ListsScreen: FC = () => {
           </div>
         )}
 
-        {lists.map(list => (
-          <ListCard key={list.id} list={list} onOpen={() => navigate(`/list/${list.id}`)} onDelete={() => void deleteList(list.id)} />
+        {activeLists.map(list => (
+          <ListCard
+            key={list.id}
+            list={list}
+            onOpen={() => navigate(`/list/${list.id}`)}
+            onDelete={() => void deleteList(list.id)}
+          />
         ))}
+
+        {archivedLists.length > 0 && (
+          <>
+            {activeLists.length > 0 && <div className="border-t border-border mt-1" />}
+            <div className="text-xs text-gray-600 pt-1 pb-0.5 px-1">Archived</div>
+            {archivedLists.map(list => (
+              <ListCard
+                key={list.id}
+                list={list}
+                archived
+                onOpen={() => navigate(`/list/${list.id}`)}
+                onDelete={() => void deleteList(list.id)}
+              />
+            ))}
+          </>
+        )}
       </div>
 
       <div className="px-3 pt-2 pb-3 border-t border-border space-y-2">
@@ -83,7 +116,12 @@ const ListsScreen: FC = () => {
   )
 }
 
-const ListCard: FC<{ list: List; onOpen: () => void; onDelete: () => void }> = ({ list, onOpen, onDelete }) => {
+const ListCard: FC<{
+  list: List
+  archived?: boolean
+  onOpen: () => void
+  onDelete: () => void
+}> = ({ list, archived, onOpen, onDelete }) => {
   const [counts, setCounts] = useState({ active: 0, total: 0 })
 
   useEffect(() => {
@@ -93,10 +131,14 @@ const ListCard: FC<{ list: List; onOpen: () => void; onDelete: () => void }> = (
   }, [list.id])
 
   return (
-    <div className="flex items-center gap-3 px-3 py-3 bg-card border border-border rounded-md hover:border-gray-600 transition-colors">
-      <button onClick={onOpen} className="flex-1 text-left">
-        <div className="text-sm font-medium text-gray-100">{list.name}</div>
-        <div className="text-xs text-gray-500 mt-0.5">
+    <div className={`flex items-center gap-3 px-3 py-3 border rounded-md transition-colors ${
+      archived
+        ? 'bg-card/40 border-border/50 hover:border-gray-700'
+        : 'bg-card border-border hover:border-gray-600'
+    }`}>
+      <button onClick={onOpen} className="flex-1 text-left min-w-0">
+        <div className={`text-sm font-medium truncate ${archived ? 'text-gray-500' : 'text-gray-100'}`}>{list.name}</div>
+        <div className="text-xs text-gray-600 mt-0.5">
           {counts.active} active · {counts.total} total · {new Date(list.createdAt).toLocaleDateString()}
         </div>
       </button>

@@ -740,3 +740,125 @@ func TestSync_Item_DefaultQuantityRoundTrip(t *testing.T) {
 	require.NotNil(t, br.Items[0].DefaultQuantity, "defaultQuantity must be stored and returned")
 	assert.Equal(t, 2.5, *br.Items[0].DefaultQuantity)
 }
+
+// ---------------------------------------------------------------------------
+// TestSync_List_ArchiveRoundTrip
+// ---------------------------------------------------------------------------
+
+// TestSync_List_ArchiveRoundTrip verifies that a list synced with archivedAt
+// set is stored on the server and returned with archivedAt populated via
+// bootstrap.
+func TestSync_List_ArchiveRoundTrip(t *testing.T) {
+	database := newTestDB(t)
+	srv := newTestServer(t, database)
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	archivedAt := now.Add(time.Minute)
+	list := models.List{
+		ID:         "list-arc-1",
+		Name:       "Old List",
+		Version:    2,
+		CreatedAt:  now,
+		UpdatedAt:  archivedAt,
+		ArchivedAt: &archivedAt,
+	}
+
+	changes := emptyChanges()
+	changes.Lists = []models.List{list}
+	resp := doSync(t, srv, syncRequest(now.Add(-time.Hour), changes))
+
+	require.Contains(t, resp.Applied, "list-arc-1")
+	assert.Empty(t, resp.Conflicts)
+
+	br := doBootstrap(t, srv)
+	require.Len(t, br.Lists, 1)
+	assert.Equal(t, "list-arc-1", br.Lists[0].ID)
+	require.NotNil(t, br.Lists[0].ArchivedAt, "archivedAt must be stored and returned")
+	assert.True(t, br.Lists[0].ArchivedAt.Equal(archivedAt))
+}
+
+// ---------------------------------------------------------------------------
+// TestSync_List_Unarchive
+// ---------------------------------------------------------------------------
+
+// TestSync_List_Unarchive verifies that a list can be unarchived by syncing
+// with archivedAt set to nil, clearing the previously stored value.
+func TestSync_List_Unarchive(t *testing.T) {
+	database := newTestDB(t)
+	srv := newTestServer(t, database)
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	// Server list was archived before lastSync, so the client is the only one
+	// that has changed since lastSync — no conflict, client wins.
+	archivedAt := now.Add(-2 * time.Minute)
+	lastSync := now.Add(-time.Minute) // after archivedAt → server not modified since
+
+	// Seed an archived list directly.
+	_, err := database.Exec(
+		`INSERT INTO lists(id, name, version, created_at, updated_at, archived_at) VALUES(?,?,?,?,?,?)`,
+		"list-unarch-1", "Archived List", 2,
+		now.Add(-time.Hour).Format(time.RFC3339Nano),
+		archivedAt.Format(time.RFC3339Nano),
+		archivedAt.Format(time.RFC3339Nano),
+	)
+	require.NoError(t, err)
+
+	// Client sends the same list without archivedAt (unarchived), with a newer updatedAt.
+	list := models.List{
+		ID:        "list-unarch-1",
+		Name:      "Archived List",
+		Version:   3,
+		CreatedAt: now.Add(-time.Hour),
+		UpdatedAt: now, // newer than archivedAt and newer than lastSync
+	}
+	changes := emptyChanges()
+	changes.Lists = []models.List{list}
+	resp := doSync(t, srv, syncRequest(lastSync, changes))
+
+	require.Contains(t, resp.Applied, "list-unarch-1")
+	assert.Empty(t, resp.Conflicts)
+
+	br := doBootstrap(t, srv)
+	require.Len(t, br.Lists, 1)
+	assert.Nil(t, br.Lists[0].ArchivedAt, "archivedAt must be cleared after unarchive sync")
+}
+
+// ---------------------------------------------------------------------------
+// TestSync_List_Archive_ContentEqualNoConflict
+// ---------------------------------------------------------------------------
+
+// TestSync_List_Archive_ContentEqualNoConflict verifies that re-sending an
+// already-archived list with identical content does not produce a conflict.
+func TestSync_List_Archive_ContentEqualNoConflict(t *testing.T) {
+	database := newTestDB(t)
+	srv := newTestServer(t, database)
+
+	lastSync := time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Millisecond)
+	archivedAt := lastSync.Add(10 * time.Minute)
+
+	// Seed an archived list on the server.
+	_, err := database.Exec(
+		`INSERT INTO lists(id, name, version, created_at, updated_at, archived_at) VALUES(?,?,?,?,?,?)`,
+		"list-eq-1", "My List", 2,
+		lastSync.Add(-time.Hour).Format(time.RFC3339Nano),
+		archivedAt.Format(time.RFC3339Nano),
+		archivedAt.Format(time.RFC3339Nano),
+	)
+	require.NoError(t, err)
+
+	// Client sends the same archived list — identical content, same timestamps.
+	list := models.List{
+		ID:         "list-eq-1",
+		Name:       "My List",
+		Version:    2,
+		CreatedAt:  lastSync.Add(-time.Hour),
+		UpdatedAt:  archivedAt,
+		ArchivedAt: &archivedAt,
+	}
+	changes := emptyChanges()
+	changes.Lists = []models.List{list}
+
+	resp := doSync(t, srv, syncRequest(lastSync, changes))
+
+	assert.Empty(t, resp.Conflicts, "identical archived list must not produce a conflict")
+}

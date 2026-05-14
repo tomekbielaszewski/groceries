@@ -402,6 +402,39 @@ describe('ItemCard — browse mode — g and ml quantity steps', () => {
   })
 })
 
+// ── Browse mode — read-only (archived list) ───────────────────────────────────
+
+describe('ItemCard — browse mode — read-only (no onRemove / onQuantityChange)', () => {
+  it('does not render the remove button when onRemove is not provided', () => {
+    render(
+      <ItemCard mode="browse" listItem={makeListItem()} shops={shops} />
+    )
+    expect(screen.queryByRole('button', { name: 'Remove from list' })).not.toBeInTheDocument()
+  })
+
+  it('does not render the quantity stepper when onQuantityChange is not provided', () => {
+    render(
+      <ItemCard mode="browse" listItem={makeListItem({ quantity: 2, unit: 'kg' })} shops={shops} />
+    )
+    expect(screen.queryByRole('button', { name: 'Decrease quantity' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Increase quantity' })).not.toBeInTheDocument()
+  })
+
+  it('still renders item name in read-only mode', () => {
+    render(
+      <ItemCard mode="browse" listItem={makeListItem()} shops={shops} />
+    )
+    expect(screen.getByText('Whole Milk')).toBeInTheDocument()
+  })
+
+  it('shows quantity and unit as plain text when onQuantityChange is absent', () => {
+    render(
+      <ItemCard mode="browse" listItem={makeListItem({ quantity: 3, unit: 'kg' })} shops={shops} />
+    )
+    expect(screen.getByText('3 kg')).toBeInTheDocument()
+  })
+})
+
 // ── Shopping mode ─────────────────────────────────────────────────────────────
 
 describe('ItemCard — shopping mode', () => {

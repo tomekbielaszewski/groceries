@@ -207,6 +207,66 @@ describe('ListScreen — quantity default when adding via search', () => {
 })
 
 // ---------------------------------------------------------------------------
+// archived list — read-only view
+// ---------------------------------------------------------------------------
+
+describe('ListScreen — archived list', () => {
+  const makeArchivedList = (id: string): List => ({
+    ...makeList(id),
+    archivedAt: new Date().toISOString(),
+  })
+
+  it('shows Archived badge instead of Shop button', async () => {
+    const list = makeArchivedList('l1')
+    await db.lists.add(list)
+
+    renderList('l1')
+
+    await screen.findByText('Archived')
+    expect(screen.queryByRole('button', { name: /^shop$/i })).not.toBeInTheDocument()
+  })
+
+  it('does not render the search input', async () => {
+    const list = makeArchivedList('l1')
+    await db.lists.add(list)
+
+    renderList('l1')
+
+    await screen.findByText('Archived')
+    expect(screen.queryByPlaceholderText('Search items…')).not.toBeInTheDocument()
+  })
+
+  it('does not render remove buttons on items', async () => {
+    const list = makeArchivedList('l1')
+    const item = makeItem('i1', { name: 'Butter' })
+    const li = makeListItem('li1', 'l1', 'i1')
+    await db.lists.add(list)
+    await db.items.add(item)
+    await db.listItems.add(li)
+
+    renderList('l1')
+
+    await screen.findByText('Butter')
+    expect(screen.queryByRole('button', { name: /remove from list/i })).not.toBeInTheDocument()
+  })
+
+  it('does not render quantity steppers on items', async () => {
+    const list = makeArchivedList('l1')
+    const item = makeItem('i1', { name: 'Milk', unit: 'l' })
+    const li = makeListItem('li1', 'l1', 'i1', { quantity: 2 })
+    await db.lists.add(list)
+    await db.items.add(item)
+    await db.listItems.add(li)
+
+    renderList('l1')
+
+    await screen.findByText('Milk')
+    expect(screen.queryByRole('button', { name: /decrease quantity/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /increase quantity/i })).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // purchase history recorded when buying in shopping mode
 // ---------------------------------------------------------------------------
 

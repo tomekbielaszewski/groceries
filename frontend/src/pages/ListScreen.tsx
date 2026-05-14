@@ -1,7 +1,7 @@
-import { type FC, useEffect, useState, useCallback } from 'react'
+import { type FC, useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { db } from '../db/schema'
-import { getListItemsWithItems, upsertListItem, skipShopForListItem, clearSkipForListItem, recordSessionItem } from '../db/queries'
+import { getListItemsWithItems, upsertList, upsertListItem, skipShopForListItem, clearSkipForListItem, recordSessionItem } from '../db/queries'
 import { useStore } from '../store/useStore'
 import type { List, ListItemWithItem, ItemWithDetails, Shop, SortMode } from '../types'
 import ItemCard from '../components/ItemCard'
@@ -18,10 +18,39 @@ const ListScreen: FC = () => {
   const [shops, setShops] = useState<Shop[]>([])
   const [refresh, setRefresh] = useState(0)
 
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
   const sortMode: SortMode = (id ? sortModes[id] : undefined) ?? 'date'
   const isShoppingMode = !!shoppingModeShopId
+  const isArchived = !!list?.archivedAt
 
   const reload = useCallback(() => setRefresh(r => r + 1), [])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [menuOpen])
+
+  const toggleArchive = async () => {
+    if (!list) return
+    const now = new Date().toISOString()
+    await upsertList({
+      ...list,
+      archivedAt: list.archivedAt ? undefined : now,
+      updatedAt: now,
+      version: list.version + 1,
+    })
+    setMenuOpen(false)
+    exitShoppingMode()
+    navigate('/')
+  }
 
   useEffect(() => {
     if (!id) return
@@ -135,15 +164,41 @@ const ListScreen: FC = () => {
           {!isShoppingMode ? (
             <>
               <SortToggle value={sortMode} onChange={m => id && setSortMode(id, m)} />
-              <button
-                onClick={() => {
-                  const firstShop = shops[0]
-                  if (firstShop) enterShoppingMode(firstShop.id)
-                }}
-                className="text-xs px-2.5 py-1 bg-green-700 hover:bg-green-600 text-white rounded transition-colors whitespace-nowrap"
-              >
-                Shop
-              </button>
+              {isArchived && (
+                <span className="text-xs px-2 py-1 border border-border rounded text-gray-500">Archived</span>
+              )}
+              {!isArchived && (
+                <button
+                  onClick={() => {
+                    const firstShop = shops[0]
+                    if (firstShop) enterShoppingMode(firstShop.id)
+                  }}
+                  className="text-xs px-2.5 py-1 bg-green-700 hover:bg-green-600 text-white rounded transition-colors whitespace-nowrap"
+                >
+                  Shop
+                </button>
+              )}
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setMenuOpen(o => !o)}
+                  aria-label="More options"
+                  className="text-gray-400 hover:text-gray-200 transition-colors p-1"
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
+                  </svg>
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-md shadow-lg z-50 py-1">
+                    <button
+                      onClick={() => void toggleArchive()}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+                    >
+                      {list?.archivedAt ? 'Unarchive list' : 'Archive list'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -215,8 +270,8 @@ const ListScreen: FC = () => {
                 mode="browse"
                 listItem={li}
                 shops={shops}
-                onRemove={() => void removeItem(li)}
-                onQuantityChange={(qty, unit) => void updateQuantity(li, qty, unit)}
+                onRemove={isArchived ? undefined : () => void removeItem(li)}
+                onQuantityChange={isArchived ? undefined : (qty, unit) => void updateQuantity(li, qty, unit)}
                 onClick={() => navigate(`/item/${li.itemId}`)}
               />
             ))}
@@ -229,19 +284,19 @@ const ListScreen: FC = () => {
                     mode="browse"
                     listItem={li}
                     shops={shops}
-                    onRemove={() => void removeItem(li)}
-                    onQuantityChange={(qty, unit) => void updateQuantity(li, qty, unit)}
+                    onRemove={isArchived ? undefined : () => void removeItem(li)}
+                    onQuantityChange={isArchived ? undefined : (qty, unit) => void updateQuantity(li, qty, unit)}
                     onClick={() => navigate(`/item/${li.itemId}`)}
                   />
                 ))}
               </>
             )}
-            {id && <SuggestionsPanel listId={id} refresh={refresh} onAdd={addItem} />}
+            {id && !isArchived && <SuggestionsPanel listId={id} refresh={refresh} onAdd={addItem} />}
           </>
         )}
       </div>
 
-      {!isShoppingMode && (
+      {!isShoppingMode && !isArchived && (
         <div className="border-t border-border px-3 pt-2 pb-3">
           <SearchInput
             dropUp

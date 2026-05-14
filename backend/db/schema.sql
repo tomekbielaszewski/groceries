@@ -40,12 +40,13 @@ CREATE TABLE IF NOT EXISTS item_tags (
 );
 
 CREATE TABLE IF NOT EXISTS lists (
-    id         TEXT PRIMARY KEY,
-    name       TEXT NOT NULL,
-    version    INTEGER NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-    deleted_at DATETIME
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    version     INTEGER NOT NULL DEFAULT 1,
+    created_at  DATETIME NOT NULL,
+    updated_at  DATETIME NOT NULL,
+    deleted_at  DATETIME,
+    archived_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS list_items (

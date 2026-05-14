@@ -43,12 +43,13 @@ type ItemTag struct {
 }
 
 type List struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	Version   int        `json:"version"`
-	CreatedAt time.Time  `json:"createdAt"`
-	UpdatedAt time.Time  `json:"updatedAt"`
-	DeletedAt *time.Time `json:"deletedAt,omitempty"`
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	Version    int        `json:"version"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
+	DeletedAt  *time.Time `json:"deletedAt,omitempty"`
+	ArchivedAt *time.Time `json:"archivedAt,omitempty"`
 }
 
 type ListItem struct {

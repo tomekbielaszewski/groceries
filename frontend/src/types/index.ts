@@ -42,6 +42,7 @@ export interface List {
   createdAt: string
   updatedAt: string
   deletedAt?: string
+  archivedAt?: string
 }
 
 export interface ListItem {

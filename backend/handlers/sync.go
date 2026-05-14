@@ -241,7 +241,7 @@ func itemContentEqual(a, b models.Item) bool {
 }
 
 func listContentEqual(a, b models.List) bool {
-	return a.Name == b.Name && ptrTimeEqual(a.DeletedAt, b.DeletedAt)
+	return a.Name == b.Name && ptrTimeEqual(a.DeletedAt, b.DeletedAt) && ptrTimeEqual(a.ArchivedAt, b.ArchivedAt)
 }
 
 func listItemContentEqual(a, b models.ListItem) bool {
@@ -374,8 +374,8 @@ func upsertList(tx *sql.Tx, l models.List, lastSync time.Time) (applied bool, co
 
 	if scanErr == sql.ErrNoRows {
 		_, err = tx.Exec(
-			`INSERT INTO lists(id, name, version, created_at, updated_at, deleted_at) VALUES(?,?,?,?,?,?)`,
-			l.ID, l.Name, l.Version, l.CreatedAt, l.UpdatedAt, l.DeletedAt,
+			`INSERT INTO lists(id, name, version, created_at, updated_at, deleted_at, archived_at) VALUES(?,?,?,?,?,?,?)`,
+			l.ID, l.Name, l.Version, l.CreatedAt, l.UpdatedAt, l.DeletedAt, l.ArchivedAt,
 		)
 		return err == nil, nil, err
 	}
@@ -385,15 +385,23 @@ func upsertList(tx *sql.Tx, l models.List, lastSync time.Time) (applied bool, co
 
 	if gsync.IsConflict(l.UpdatedAt, dbUpdatedAt, lastSync) {
 		var dbList models.List
-		if e := tx.QueryRow(`SELECT id, name, version, created_at, updated_at, deleted_at FROM lists WHERE id=?`, l.ID).
-			Scan(&dbList.ID, &dbList.Name, &dbList.Version, &dbList.CreatedAt, &dbList.UpdatedAt, &dbList.DeletedAt); e != nil {
+		var dbDeletedAt sql.NullTime
+		var dbArchivedAt sql.NullTime
+		if e := tx.QueryRow(`SELECT id, name, version, created_at, updated_at, deleted_at, archived_at FROM lists WHERE id=?`, l.ID).
+			Scan(&dbList.ID, &dbList.Name, &dbList.Version, &dbList.CreatedAt, &dbList.UpdatedAt, &dbDeletedAt, &dbArchivedAt); e != nil {
 			return false, nil, e
+		}
+		if dbDeletedAt.Valid {
+			dbList.DeletedAt = &dbDeletedAt.Time
+		}
+		if dbArchivedAt.Valid {
+			dbList.ArchivedAt = &dbArchivedAt.Time
 		}
 		if listContentEqual(l, dbList) {
 			if l.UpdatedAt.After(dbUpdatedAt) {
 				_, err = tx.Exec(
-					`UPDATE lists SET name=?, version=?, updated_at=?, deleted_at=? WHERE id=?`,
-					l.Name, l.Version, l.UpdatedAt, l.DeletedAt, l.ID,
+					`UPDATE lists SET name=?, version=?, updated_at=?, deleted_at=?, archived_at=? WHERE id=?`,
+					l.Name, l.Version, l.UpdatedAt, l.DeletedAt, l.ArchivedAt, l.ID,
 				)
 				return err == nil, nil, err
 			}
@@ -405,8 +413,8 @@ func upsertList(tx *sql.Tx, l models.List, lastSync time.Time) (applied bool, co
 
 	if l.UpdatedAt.After(dbUpdatedAt) {
 		_, err = tx.Exec(
-			`UPDATE lists SET name=?, version=?, updated_at=?, deleted_at=? WHERE id=?`,
-			l.Name, l.Version, l.UpdatedAt, l.DeletedAt, l.ID,
+			`UPDATE lists SET name=?, version=?, updated_at=?, deleted_at=?, archived_at=? WHERE id=?`,
+			l.Name, l.Version, l.UpdatedAt, l.DeletedAt, l.ArchivedAt, l.ID,
 		)
 		return err == nil, nil, err
 	}
