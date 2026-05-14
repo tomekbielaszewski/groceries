@@ -55,6 +55,7 @@ jobs:
       - name: Test base with coverage
         id: base-cov
         if: steps.base-sha.outputs.sha != ''
+        continue-on-error: true
         working-directory: base-repo/backend
         run: |
           go test -coverprofile=coverage.out ./...
@@ -131,6 +132,7 @@ jobs:
       - name: Test base with coverage
         id: base-cov
         if: steps.base-sha.outputs.sha != ''
+        continue-on-error: true
         working-directory: base-repo/frontend
         run: |
           npx vitest run --coverage --coverage.reporter=json-summary
