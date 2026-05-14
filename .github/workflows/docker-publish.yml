@@ -6,38 +6,152 @@ on:
       - master
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - master
 
 jobs:
   test-backend:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
-      - name: Test
-        run: go test ./...
+
+      - name: Test with coverage
+        working-directory: backend
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Compute current coverage
+        id: current-cov
+        working-directory: backend
+        run: |
+          PCT=$(go tool cover -func=coverage.out | grep '^total' | awk '{print $3}' | tr -d '%')
+          echo "pct=$PCT" >> $GITHUB_OUTPUT
+          echo "Current coverage: $PCT%"
+
+      - name: Resolve base SHA
+        id: base-sha
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "sha=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          else
+            echo "sha=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout base
+        uses: actions/checkout@v5
+        if: steps.base-sha.outputs.sha != ''
+        with:
+          ref: ${{ steps.base-sha.outputs.sha }}
+          path: base-repo
+
+      - name: Test base with coverage
+        id: base-cov
+        if: steps.base-sha.outputs.sha != ''
+        working-directory: base-repo/backend
+        run: |
+          go test -coverprofile=coverage.out ./...
+          PCT=$(go tool cover -func=coverage.out | grep '^total' | awk '{print $3}' | tr -d '%')
+          echo "pct=$PCT" >> $GITHUB_OUTPUT
+          echo "Base coverage: $PCT%"
+
+      - name: Check coverage did not drop
+        if: steps.base-cov.outputs.pct != ''
+        run: |
+          python3 -c "
+          import sys
+          base = float('${{ steps.base-cov.outputs.pct }}')
+          current = float('${{ steps.current-cov.outputs.pct }}')
+          print(f'Base coverage:    {base:.1f}%')
+          print(f'Current coverage: {current:.1f}%')
+          if current < base:
+              print(f'FAIL: Coverage dropped by {base - current:.1f}%')
+              sys.exit(1)
+          print(f'OK: Coverage maintained (delta: {current - base:+.1f}%)')
+          "
 
   test-frontend:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - uses: actions/setup-node@v5
         with:
           node-version: lts/*
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
       - name: Install dependencies
+        working-directory: frontend
         run: npm ci
-      - name: Test
-        run: npm test -- --run
+
+      - name: Test with coverage
+        working-directory: frontend
+        run: npm run test:coverage
+
+      - name: Compute current coverage
+        id: current-cov
+        working-directory: frontend
+        run: |
+          PCT=$(node -e "const c=require('./coverage/coverage-summary.json');console.log(c.total.lines.pct)")
+          echo "pct=$PCT" >> $GITHUB_OUTPUT
+          echo "Current coverage: $PCT%"
+
+      - name: Resolve base SHA
+        id: base-sha
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            echo "sha=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          else
+            echo "sha=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout base
+        uses: actions/checkout@v5
+        if: steps.base-sha.outputs.sha != ''
+        with:
+          ref: ${{ steps.base-sha.outputs.sha }}
+          path: base-repo
+
+      - name: Install base dependencies
+        if: steps.base-sha.outputs.sha != ''
+        working-directory: base-repo/frontend
+        run: npm ci
+
+      - name: Test base with coverage
+        id: base-cov
+        if: steps.base-sha.outputs.sha != ''
+        working-directory: base-repo/frontend
+        run: |
+          npx vitest run --coverage --coverage.reporter=json-summary
+          PCT=$(node -e "const c=require('./coverage/coverage-summary.json');console.log(c.total.lines.pct)")
+          echo "pct=$PCT" >> $GITHUB_OUTPUT
+          echo "Base coverage: $PCT%"
+
+      - name: Check coverage did not drop
+        if: steps.base-cov.outputs.pct != ''
+        run: |
+          python3 -c "
+          import sys
+          base = float('${{ steps.base-cov.outputs.pct }}')
+          current = float('${{ steps.current-cov.outputs.pct }}')
+          print(f'Base coverage:    {base:.1f}%')
+          print(f'Current coverage: {current:.1f}%')
+          if current < base:
+              print(f'FAIL: Coverage dropped by {base - current:.1f}%')
+              sys.exit(1)
+          print(f'OK: Coverage maintained (delta: {current - base:+.1f}%)')
+          "
 
   build-and-push:
     needs: [test-backend, test-frontend]
