@@ -4,11 +4,12 @@ import {
   getItemsWithDetails,
   getFrequentItems,
   upsertItem,
+  upsertList,
   skipShopForListItem,
   clearSkipForListItem,
   isEmpty,
 } from './queries'
-import type { Item, Shop, SessionItem, ShoppingSession, ListItem } from '../types'
+import type { Item, List, Shop, SessionItem, ShoppingSession, ListItem } from '../types'
 
 // Helpers to build minimal valid records
 const makeShop = (id: string, color = '#ff0000'): Shop => ({
@@ -353,6 +354,67 @@ describe('clearSkipForListItem', () => {
   it('clearSkipForListItem is a no-op when row does not exist', async () => {
     // Should not throw
     await expect(clearSkipForListItem('no-such-li', 'no-such-shop')).resolves.not.toThrow()
+  })
+})
+
+// ── upsertList ─────────────────────────────────────────────────────────────────
+
+const makeList = (id: string, overrides: Partial<List> = {}): List => ({
+  id,
+  name: `List ${id}`,
+  version: 1,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  ...overrides,
+})
+
+describe('upsertList', () => {
+  it('creates a new list and adds it to pendingSyncIds', async () => {
+    const list = makeList('list-1')
+    await upsertList(list)
+
+    const saved = await db.lists.get('list-1')
+    expect(saved).toBeDefined()
+    expect(saved!.name).toBe('List list-1')
+
+    const pending = await db.pendingSyncIds.get('list-1')
+    expect(pending).toBeDefined()
+    expect(pending!.entity).toBe('list')
+  })
+
+  it('updates an existing list and refreshes pendingSyncIds', async () => {
+    const list = makeList('list-2')
+    await upsertList(list)
+
+    const updated = { ...list, name: 'Renamed', version: 2, updatedAt: new Date().toISOString() }
+    await upsertList(updated)
+
+    const saved = await db.lists.get('list-2')
+    expect(saved!.name).toBe('Renamed')
+    expect(saved!.version).toBe(2)
+
+    const allLists = await db.lists.toArray()
+    expect(allLists).toHaveLength(1)
+  })
+
+  it('stores archivedAt when set', async () => {
+    const archivedAt = new Date().toISOString()
+    const list = makeList('list-3', { archivedAt })
+    await upsertList(list)
+
+    const saved = await db.lists.get('list-3')
+    expect(saved!.archivedAt).toBe(archivedAt)
+  })
+
+  it('clears archivedAt when unarchiving (archivedAt set to undefined)', async () => {
+    const archivedAt = new Date().toISOString()
+    await upsertList(makeList('list-4', { archivedAt }))
+
+    const unarchived = { ...makeList('list-4'), archivedAt: undefined, version: 2 }
+    await upsertList(unarchived)
+
+    const saved = await db.lists.get('list-4')
+    expect(saved!.archivedAt).toBeUndefined()
   })
 })
 

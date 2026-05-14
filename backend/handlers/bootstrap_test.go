@@ -96,3 +96,40 @@ func TestBootstrap_ResponseShape(t *testing.T) {
 	assert.True(t, !resp.ServerTime.After(after.Add(5*time.Second)),
 		"serverTime should be within 5 seconds of now")
 }
+
+func TestBootstrap_List_ArchivedAt(t *testing.T) {
+	database := newTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	archivedAt := now.Add(time.Minute)
+
+	_, err := database.Exec(
+		`INSERT INTO lists(id, name, version, created_at, updated_at, archived_at) VALUES(?,?,?,?,?,?)`,
+		"list-archived", "Done", 1,
+		now.Format(time.RFC3339), now.Format(time.RFC3339), archivedAt.Format(time.RFC3339),
+	)
+	require.NoError(t, err)
+
+	srv := newTestServer(t, database)
+	resp := doBootstrap(t, srv)
+
+	require.Len(t, resp.Lists, 1)
+	assert.Equal(t, "list-archived", resp.Lists[0].ID)
+	require.NotNil(t, resp.Lists[0].ArchivedAt, "bootstrap must return archivedAt for archived lists")
+}
+
+func TestBootstrap_List_ArchivedAt_Nil_WhenNotSet(t *testing.T) {
+	database := newTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	_, err := database.Exec(
+		`INSERT INTO lists(id, name, version, created_at, updated_at) VALUES(?,?,?,?,?)`,
+		"list-active", "Active", 1, now.Format(time.RFC3339), now.Format(time.RFC3339),
+	)
+	require.NoError(t, err)
+
+	srv := newTestServer(t, database)
+	resp := doBootstrap(t, srv)
+
+	require.Len(t, resp.Lists, 1)
+	assert.Nil(t, resp.Lists[0].ArchivedAt, "bootstrap must return nil archivedAt for active lists")
+}

@@ -76,6 +76,11 @@ func migrate(db *sql.DB) error {
 		return fmt.Errorf("migrate items.default_quantity: %w", err)
 	}
 
+	_, err = db.Exec(`ALTER TABLE lists ADD COLUMN archived_at DATETIME`)
+	if err != nil && !isDuplicateColumnError(err) {
+		return fmt.Errorf("migrate lists.archived_at: %w", err)
+	}
+
 	if err := normalizeExistingTags(db); err != nil {
 		return fmt.Errorf("migrate normalize tags: %w", err)
 	}

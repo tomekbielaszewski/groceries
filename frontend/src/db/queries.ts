@@ -1,7 +1,7 @@
 import { db } from './schema'
 import type {
   Item, ItemWithDetails, ListItemWithItem,
-  ListItem, Shop, Tag, SessionItem,
+  List, ListItem, Shop, Tag, SessionItem,
 } from '../types'
 
 export async function getItemsWithDetails(searchTerm?: string): Promise<ItemWithDetails[]> {
@@ -147,6 +147,13 @@ export async function upsertItem(
     await db.itemTags.where('itemId').equals(item.id).delete()
     await db.itemTags.bulkPut(tagIds.map(tagId => ({ itemId: item.id, tagId })))
     await db.pendingSyncIds.put({ id: item.id, entity: 'item', changedAt: new Date().toISOString() })
+  })
+}
+
+export async function upsertList(list: List): Promise<void> {
+  await db.transaction('rw', [db.lists, db.pendingSyncIds], async () => {
+    await db.lists.put(list)
+    await db.pendingSyncIds.put({ id: list.id, entity: 'list', changedAt: new Date().toISOString() })
   })
 }
 

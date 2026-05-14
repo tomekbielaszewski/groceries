@@ -15,8 +15,8 @@ interface BrowseCardProps {
   mode: 'browse'
   listItem: ListItemWithItem
   shops: { id: string; name: string; color: string }[]
-  onRemove: () => void
-  onQuantityChange: (qty: number | undefined, unit: string | undefined) => void
+  onRemove?: () => void
+  onQuantityChange?: (qty: number | undefined, unit: string | undefined) => void
   onClick?: () => void
 }
 
@@ -90,14 +90,14 @@ const BrowseCard: FC<BrowseCardProps> = ({ listItem, onRemove, onQuantityChange,
     e.stopPropagation()
     if (isKgL(unit) && qty != null && qty < 1) {
       const idx = findKgLIdx(qty)
-      onQuantityChange(idx !== -1 && idx < KG_L_SUB_STEPS.length - 1 ? KG_L_SUB_STEPS[idx + 1] : 1, unit || undefined)
+      onQuantityChange!(idx !== -1 && idx < KG_L_SUB_STEPS.length - 1 ? KG_L_SUB_STEPS[idx + 1] : 1, unit || undefined)
     } else if (isGMl(unit) && qty != null && qty < 100) {
       const idx = findGMlIdx(qty)
-      onQuantityChange(idx !== -1 && idx < G_ML_SUB_STEPS.length - 1 ? G_ML_SUB_STEPS[idx + 1] : 100, unit || undefined)
+      onQuantityChange!(idx !== -1 && idx < G_ML_SUB_STEPS.length - 1 ? G_ML_SUB_STEPS[idx + 1] : 100, unit || undefined)
     } else if (isGMl(unit)) {
-      onQuantityChange((qty ?? 0) + 50, unit || undefined)
+      onQuantityChange!((qty ?? 0) + 50, unit || undefined)
     } else {
-      onQuantityChange((qty ?? 0) + 1, unit || undefined)
+      onQuantityChange!((qty ?? 0) + 1, unit || undefined)
     }
   }
 
@@ -106,17 +106,17 @@ const BrowseCard: FC<BrowseCardProps> = ({ listItem, onRemove, onQuantityChange,
     if (isKgL(unit) && qty != null && qty <= 1) {
       const idx = findKgLIdx(qty)
       if (idx <= 0) return
-      onQuantityChange(KG_L_SUB_STEPS[idx - 1], unit || undefined)
+      onQuantityChange!(KG_L_SUB_STEPS[idx - 1], unit || undefined)
     } else if (isGMl(unit) && qty != null && qty <= 100) {
       const idx = findGMlIdx(qty)
       if (idx <= 0) return
-      onQuantityChange(G_ML_SUB_STEPS[idx - 1], unit || undefined)
+      onQuantityChange!(G_ML_SUB_STEPS[idx - 1], unit || undefined)
     } else if (isGMl(unit) && qty != null) {
-      onQuantityChange(qty - 50, unit || undefined)
+      onQuantityChange!(qty - 50, unit || undefined)
     } else if (qty == null || qty <= 1) {
-      onQuantityChange(undefined, unit || undefined)
+      onQuantityChange!(undefined, unit || undefined)
     } else {
-      onQuantityChange(qty - 1, unit || undefined)
+      onQuantityChange!(qty - 1, unit || undefined)
     }
   }
 
@@ -134,7 +134,7 @@ const BrowseCard: FC<BrowseCardProps> = ({ listItem, onRemove, onQuantityChange,
         <span className={`text-sm font-medium truncate block ${bought ? 'text-gray-500' : 'text-gray-100'}`}>
           {listItem.item.name}
         </span>
-        {!bought && (
+        {!bought && onQuantityChange && (
           <div className="flex items-center gap-1 mt-0.5" onClick={e => e.stopPropagation()}>
             <button
               onClick={decrement}
@@ -155,6 +155,9 @@ const BrowseCard: FC<BrowseCardProps> = ({ listItem, onRemove, onQuantityChange,
             </button>
             {unit && <span className="text-xs text-gray-500 ml-1">{unit}</span>}
           </div>
+        )}
+        {!bought && !onQuantityChange && unit && (
+          <span className="text-xs text-gray-500 mt-0.5">{qty != null ? `${qty} ${unit}` : unit}</span>
         )}
       </div>
 
@@ -182,13 +185,15 @@ const BrowseCard: FC<BrowseCardProps> = ({ listItem, onRemove, onQuantityChange,
       )}
 
       {/* Remove */}
-      <button
-        onClick={onRemove}
-        aria-label="Remove from list"
-        className="text-gray-600 hover:text-red-400 transition-colors text-lg leading-none flex-shrink-0 p-1"
-      >
-        ×
-      </button>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          aria-label="Remove from list"
+          className="text-gray-600 hover:text-red-400 transition-colors text-lg leading-none flex-shrink-0 p-1"
+        >
+          ×
+        </button>
+      )}
     </div>
   )
 }
