@@ -143,7 +143,7 @@ jobs:
         continue-on-error: true
         working-directory: base-repo/frontend
         run: |
-          npx vitest run --coverage --coverage.reporter=json-summary
+          npx vitest run --coverage --coverage.reporter=json-summary --reporter=dot
           PCT=$(node -e "const c=require('./coverage/coverage-summary.json');console.log(c.total.lines.pct)")
           echo "pct=$PCT" >> $GITHUB_OUTPUT
           echo "Base coverage: $PCT%"
@@ -152,15 +152,23 @@ jobs:
         if: steps.base-cov.outputs.pct != ''
         run: |
           python3 -c "
-          import sys
+          import sys, os
           base = float('${{ steps.base-cov.outputs.pct }}')
           current = float('${{ steps.current-cov.outputs.pct }}')
-          print(f'Base coverage:    {base:.1f}%')
-          print(f'Current coverage: {current:.1f}%')
+          delta = current - base
+          status = 'OK' if current >= base else 'FAIL'
+          lines = [
+              f'Base coverage:    {base:.1f}%',
+              f'Current coverage: {current:.1f}%',
+              f'{status}: Coverage maintained (delta: {delta:+.1f}%)',
+          ]
+          for line in lines:
+              print(line)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write('### Frontend coverage\n')
+              f.write('\n'.join(f'    {l}' for l in lines) + '\n')
           if current < base:
-              print(f'FAIL: Coverage dropped by {base - current:.1f}%')
               sys.exit(1)
-          print(f'OK: Coverage maintained (delta: {current - base:+.1f}%)')
           "
 
   build-and-push:
