@@ -43,6 +43,13 @@ const ListsScreen: FC = () => {
     void load()
   }
 
+  const archiveList = async (id: string) => {
+    const list = await db.lists.get(id)
+    if (!list) return
+    await upsertList({ ...list, archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), version: list.version + 1 })
+    void load()
+  }
+
   const activeLists = lists.filter(l => !l.archivedAt)
   const archivedLists = lists.filter(l => !!l.archivedAt)
 
@@ -64,7 +71,7 @@ const ListsScreen: FC = () => {
             key={list.id}
             list={list}
             onOpen={() => navigate(`/list/${list.id}`)}
-            onDelete={() => void deleteList(list.id)}
+            onAction={() => void archiveList(list.id)}
           />
         ))}
 
@@ -78,7 +85,7 @@ const ListsScreen: FC = () => {
                 list={list}
                 archived
                 onOpen={() => navigate(`/list/${list.id}`)}
-                onDelete={() => void deleteList(list.id)}
+                onAction={() => void deleteList(list.id)}
               />
             ))}
           </>
@@ -120,8 +127,8 @@ const ListCard: FC<{
   list: List
   archived?: boolean
   onOpen: () => void
-  onDelete: () => void
-}> = ({ list, archived, onOpen, onDelete }) => {
+  onAction: () => void
+}> = ({ list, archived, onOpen, onAction }) => {
   const [counts, setCounts] = useState({ active: 0, total: 0 })
 
   useEffect(() => {
@@ -142,15 +149,27 @@ const ListCard: FC<{
           {counts.active} active · {counts.total} total · {new Date(list.createdAt).toLocaleDateString()}
         </div>
       </button>
-      <button
-        onClick={onDelete}
-        aria-label="Delete list"
-        className="text-gray-600 hover:text-red-400 transition-colors p-1"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
+      {archived ? (
+        <button
+          onClick={onAction}
+          aria-label="Delete list"
+          className="text-gray-600 hover:text-red-400 transition-colors p-1"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      ) : (
+        <button
+          onClick={onAction}
+          aria-label="Archive list"
+          className="text-gray-600 hover:text-yellow-400 transition-colors p-1"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }
