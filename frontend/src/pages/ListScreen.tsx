@@ -20,6 +20,8 @@ const ListScreen: FC = () => {
 
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameName, setRenameName] = useState('')
 
   const sortMode: SortMode = (id ? sortModes[id] : undefined) ?? 'date'
   const isShoppingMode = !!shoppingModeShopId
@@ -37,6 +39,21 @@ const ListScreen: FC = () => {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [menuOpen])
+
+  const openRename = () => {
+    setRenameName(list?.name ?? '')
+    setMenuOpen(false)
+    setRenameOpen(true)
+  }
+
+  const saveRename = async () => {
+    if (!list || !renameName.trim()) return
+    const now = new Date().toISOString()
+    const updated = { ...list, name: renameName.trim(), updatedAt: now, version: list.version + 1 }
+    await upsertList(updated)
+    setList(updated)
+    setRenameOpen(false)
+  }
 
   const toggleArchive = async () => {
     if (!list) return
@@ -160,7 +177,7 @@ const ListScreen: FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="flex-1 text-sm font-semibold text-gray-100 truncate">{list.name}</h1>
+          <h1 className="flex-1 text-sm font-semibold text-gray-100 truncate" role="heading" aria-level={1}>{list.name}</h1>
           {!isShoppingMode ? (
             <>
               <SortToggle value={sortMode} onChange={m => id && setSortMode(id, m)} />
@@ -190,6 +207,14 @@ const ListScreen: FC = () => {
                 </button>
                 {menuOpen && (
                   <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-md shadow-lg z-50 py-1">
+                    {!isArchived && (
+                      <button
+                        onClick={openRename}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+                      >
+                        Rename list
+                      </button>
+                    )}
                     <button
                       onClick={() => void toggleArchive()}
                       className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
@@ -304,6 +329,40 @@ const ListScreen: FC = () => {
             onCreateNew={name => navigate(`/item/new?name=${encodeURIComponent(name)}&listId=${id}`)}
             excludeIds={new Set(activeItems.map(li => li.itemId))}
           />
+        </div>
+      )}
+
+      {renameOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-card border border-border rounded-lg p-4 w-full max-w-sm space-y-3">
+            <h2 className="text-sm font-semibold text-gray-100">Rename list</h2>
+            <input
+              autoFocus
+              type="text"
+              aria-label="List name"
+              value={renameName}
+              onChange={e => setRenameName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') void saveRename()
+                if (e.key === 'Escape') setRenameOpen(false)
+              }}
+              className="w-full bg-transparent border border-border rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-gray-500"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setRenameOpen(false)}
+                className="text-xs px-3 py-1.5 border border-border rounded text-gray-400 hover:text-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void saveRename()}
+                className="text-xs px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
