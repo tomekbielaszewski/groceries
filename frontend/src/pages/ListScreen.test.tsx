@@ -267,6 +267,109 @@ describe('ListScreen — archived list', () => {
 })
 
 // ---------------------------------------------------------------------------
+// rename list
+// ---------------------------------------------------------------------------
+
+describe('ListScreen — rename list', () => {
+  it('opens a rename dialog from the three-dot menu', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    await db.lists.add(list)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /more options/i }))
+    expect(await screen.findByRole('button', { name: /rename list/i })).toBeInTheDocument()
+  })
+
+  it('pre-fills the input with the current list name', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    await db.lists.add(list)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /more options/i }))
+    await user.click(await screen.findByRole('button', { name: /rename list/i }))
+
+    const input = await screen.findByRole('textbox', { name: /list name/i })
+    expect((input as HTMLInputElement).value).toBe('Test list')
+  })
+
+  it('saves the new name to the database', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    await db.lists.add(list)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /more options/i }))
+    await user.click(await screen.findByRole('button', { name: /rename list/i }))
+
+    const input = await screen.findByRole('textbox', { name: /list name/i })
+    await user.clear(input)
+    await user.type(input, 'Weekly shopping')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(async () => {
+      const updated = await db.lists.get('l1')
+      expect(updated?.name).toBe('Weekly shopping')
+    })
+  })
+
+  it('updates the header title after rename', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    await db.lists.add(list)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /more options/i }))
+    await user.click(await screen.findByRole('button', { name: /rename list/i }))
+
+    const input = await screen.findByRole('textbox', { name: /list name/i })
+    await user.clear(input)
+    await user.type(input, 'New name')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('New name')
+    })
+  })
+
+  it('does not show rename option for archived lists', async () => {
+    const user = userEvent.setup()
+    const list: List = { ...makeList('l1'), archivedAt: new Date().toISOString() }
+    await db.lists.add(list)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /more options/i }))
+    expect(screen.queryByRole('button', { name: /rename list/i })).not.toBeInTheDocument()
+  })
+
+  it('closes the dialog on cancel without saving', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    await db.lists.add(list)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /more options/i }))
+    await user.click(await screen.findByRole('button', { name: /rename list/i }))
+
+    const input = await screen.findByRole('textbox', { name: /list name/i })
+    await user.clear(input)
+    await user.type(input, 'Changed name')
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(screen.queryByRole('textbox', { name: /list name/i })).not.toBeInTheDocument()
+    const updated = await db.lists.get('l1')
+    expect(updated?.name).toBe('Test list')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // purchase history recorded when buying in shopping mode
 // ---------------------------------------------------------------------------
 
