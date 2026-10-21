@@ -125,6 +125,47 @@ describe('ItemDetailScreen — tag filtering', () => {
     })
   })
 
+  it('clears the search input when a matching tag suggestion is clicked', async () => {
+    store.tags.set('t1', { id: 't1', name: 'dairy' })
+    store.tags.set('t2', { id: 't2', name: 'drinks' })
+    store.tags.set('t3', { id: 't3', name: 'frozen' })
+
+    const user = userEvent.setup()
+    renderNewItem()
+
+    const input = await screen.findByPlaceholderText('Add tag…')
+    await user.type(input, 'dr')
+
+    const drinksBtn = await screen.findByRole('button', { name: '+ drinks' })
+    await user.click(drinksBtn)
+
+    await waitFor(() => {
+      expect(input).toHaveValue('')
+    })
+  })
+
+  it('refreshes the suggestion list to show all remaining tags after one is chosen', async () => {
+    store.tags.set('t1', { id: 't1', name: 'dairy' })
+    store.tags.set('t2', { id: 't2', name: 'drinks' })
+    store.tags.set('t3', { id: 't3', name: 'frozen' })
+
+    const user = userEvent.setup()
+    renderNewItem()
+
+    const input = await screen.findByPlaceholderText('Add tag…')
+    await user.type(input, 'dr')
+
+    const drinksBtn = await screen.findByRole('button', { name: '+ drinks' })
+    await user.click(drinksBtn)
+
+    await waitFor(() => {
+      // The chosen tag is gone, but the remaining tags now show unfiltered
+      expect(screen.queryByRole('button', { name: '+ drinks' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '+ dairy' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '+ frozen' })).toBeInTheDocument()
+    })
+  })
+
   it('pressing Enter adds a new tag and clears the input', async () => {
     const user = userEvent.setup()
     renderNewItem()

@@ -305,7 +305,10 @@ const ItemDetailScreen: FC = () => {
                 {filtered.map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setSelectedTags(prev => [...prev, t.id])}
+                    onClick={() => {
+                      setSelectedTags(prev => [...prev, t.id])
+                      setNewTag('')
+                    }}
                     className="text-xs px-1.5 py-0.5 rounded border border-dashed border-border text-gray-500 hover:border-gray-400 hover:text-gray-300 transition-colors"
                   >
                     + {t.name}
