@@ -1,4 +1,4 @@
-import { type FC, type ReactNode } from 'react'
+import { type FC, type ReactNode, useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 
 const nav = [
@@ -7,8 +7,29 @@ const nav = [
   { to: '/settings',   label: 'Settings',   icon: SettingsIcon },
 ]
 
-const Layout: FC<{ children: ReactNode }> = ({ children }) => (
-  <div className="flex flex-col h-svh max-w-md mx-auto">
+// Tracks the visual viewport height so the bottom action bars stay visible
+// above the on-screen keyboard (which shrinks the visual viewport but leaves
+// innerHeight/layout height unchanged on mobile).
+function useViewportHeight(): number | undefined {
+  const [height, setHeight] = useState<number | undefined>(undefined)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => setHeight(vv.height)
+    update()
+    vv.addEventListener('resize', update)
+    return () => vv.removeEventListener('resize', update)
+  }, [])
+  return height
+}
+
+const Layout: FC<{ children: ReactNode }> = ({ children }) => {
+  const viewportHeight = useViewportHeight()
+  return (
+  <div
+    className="flex flex-col h-svh max-w-md mx-auto"
+    style={viewportHeight !== undefined ? { height: viewportHeight } : undefined}
+  >
     <main className="flex-1 overflow-y-auto">
       {children}
     </main>
@@ -30,7 +51,8 @@ const Layout: FC<{ children: ReactNode }> = ({ children }) => (
       ))}
     </nav>
   </div>
-)
+  )
+}
 
 function ListsIcon() {
   return (
