@@ -2,6 +2,7 @@ import { type FC, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../api/client'
 import { useLiveData } from '../components/useLiveData'
+import { formatISODate } from '../utils/dateUtils'
 import type { List } from '../types'
 
 const ListsScreen: FC = () => {
@@ -102,7 +103,7 @@ const ListsScreen: FC = () => {
           </div>
         )}
         <button
-          onClick={() => setCreating(true)}
+          onClick={() => { setNewName(formatISODate(new Date())); setCreating(true) }}
           className="w-full text-sm py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
         >
           + New list

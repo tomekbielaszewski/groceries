@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import ListsScreen from './ListsScreen'
 import { apiClient } from '../api/client'
+import { formatISODate } from '../utils/dateUtils'
 import type { List } from '../types'
 import type { ServerEvent } from '../api/transport'
 
@@ -88,5 +89,16 @@ describe('ListsScreen — live updates from remote events', () => {
       expect(screen.getByText('Second')).toBeInTheDocument()
     })
     unsubscribe()
+  })
+})
+
+describe('ListsScreen — new list default name', () => {
+  it('pre-fills the new list name with today\'s date in yyyy-mm-dd', () => {
+    renderLists()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New list' }))
+
+    const input = screen.getByPlaceholderText('List name…') as HTMLInputElement
+    expect(input.value).toBe(formatISODate(new Date()))
   })
 })
