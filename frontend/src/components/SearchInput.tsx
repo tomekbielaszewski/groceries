@@ -20,6 +20,13 @@ const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', on
   const [open, setOpen] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const refocus = () => {
+    setQuery('')
+    setOpen(false)
+    inputRef.current?.focus()
+  }
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current)
@@ -49,6 +56,7 @@ const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', on
   return (
     <div ref={ref} className="relative">
       <input
+        ref={inputRef}
         type="text"
         value={query}
         onChange={e => setQuery(e.target.value)}
@@ -59,8 +67,7 @@ const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', on
             } else if (!exactMatch) {
               onCreateNew(query.trim())
             }
-            setQuery('')
-            setOpen(false)
+            refocus()
           }
         }}
         placeholder={placeholder}
@@ -71,7 +78,7 @@ const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', on
           {results.map(item => (
             <button
               key={item.id}
-              onMouseDown={() => { onSelect(item); setQuery(''); setOpen(false) }}
+              onMouseDown={() => { onSelect(item); refocus() }}
               className="w-full flex items-center gap-2 px-2.5 py-2 text-sm hover:bg-border text-left transition-colors"
             >
               <span className="flex-1 truncate">{item.name}</span>
@@ -86,14 +93,14 @@ const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', on
           {!exactMatch && query.trim() && (
             <>
               <button
-                onMouseDown={() => { onCreateNew(query.trim()); setQuery(''); setOpen(false) }}
+                onMouseDown={() => { onCreateNew(query.trim()); refocus() }}
                 className="w-full px-2.5 py-2 text-sm text-blue-400 hover:bg-border text-left transition-colors border-t border-border"
               >
                 + Add "{query.trim()}"
               </button>
               {onAddOneTime && (!excludeOneTimeNames || !excludeOneTimeNames.has(query.trim())) && (
                 <button
-                  onMouseDown={() => { onAddOneTime(query.trim()); setQuery(''); setOpen(false) }}
+                  onMouseDown={() => { onAddOneTime(query.trim()); refocus() }}
                   className="w-full px-2.5 py-2 text-sm text-purple-400 hover:bg-border text-left transition-colors border-t border-border"
                 >
                   + One-time: "{query.trim()}"

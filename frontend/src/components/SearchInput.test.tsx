@@ -78,6 +78,52 @@ describe('SearchInput — Enter key behaviour', () => {
   })
 })
 
+describe('SearchInput — focus retention and clearing after selection', () => {
+  beforeEach(() => {
+    vi.mocked(apiClient.getItemsWithDetails).mockResolvedValue([makeItem()])
+  })
+
+  it('clears the search box and retains focus on the input after selecting a result', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+
+    render(
+      <SearchInput onSelect={onSelect} onCreateNew={vi.fn()} />
+    )
+
+    const input = screen.getByPlaceholderText('Search items…') as HTMLInputElement
+    await user.type(input, 'jabl')
+
+    await waitFor(() => expect(screen.getByText('Jabłka')).toBeInTheDocument())
+
+    await user.click(screen.getByText('Jabłka'))
+
+    expect(onSelect).toHaveBeenCalledOnce()
+    expect(input.value).toBe('')
+    expect(input).toHaveFocus()
+  })
+
+  it('clears the search box and retains focus on the input after selecting via Enter', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+
+    render(
+      <SearchInput onSelect={onSelect} onCreateNew={vi.fn()} />
+    )
+
+    const input = screen.getByPlaceholderText('Search items…') as HTMLInputElement
+    await user.type(input, 'jabl')
+
+    await waitFor(() => expect(screen.getByText('Jabłka')).toBeInTheDocument())
+
+    await user.keyboard('{Enter}')
+
+    expect(onSelect).toHaveBeenCalledOnce()
+    expect(input.value).toBe('')
+    expect(input).toHaveFocus()
+  })
+})
+
 describe('SearchInput — duplicate prevention when item is excluded (already on list)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
