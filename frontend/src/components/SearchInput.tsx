@@ -64,8 +64,24 @@ const SearchInput: FC<SearchInputProps> = ({ placeholder = 'Search items…', on
           }
         }}
         placeholder={placeholder}
-        className="w-full bg-card border border-border rounded px-2.5 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+        className="w-full bg-card border border-border rounded pl-2.5 pr-8 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
       />
+      {query && (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={() => {
+            if (timer.current) clearTimeout(timer.current)
+            setQuery('')
+            setOpen(false)
+          }}
+          className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-200"
+        >
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
       {open && (results.length > 0 || query.trim()) && (
         <div role="listbox" className={`absolute ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 right-0 bg-elevated border border-border/80 rounded shadow-2xl z-50 overflow-hidden`}>
           {results.map(item => (

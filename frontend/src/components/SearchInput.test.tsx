@@ -267,3 +267,42 @@ describe('SearchInput — "+ One-time" action', () => {
     expect(screen.queryByText('+ One-time: "Jabłka"')).not.toBeInTheDocument()
   })
 })
+
+describe('SearchInput — clear button', () => {
+  beforeEach(() => {
+    vi.mocked(apiClient.getItemsWithDetails).mockResolvedValue([makeItem()])
+  })
+
+  it('does NOT render a clear button when the input is empty', () => {
+    render(<SearchInput onSelect={vi.fn()} onCreateNew={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: /clear/i })).not.toBeInTheDocument()
+  })
+
+  it('renders a clear button once text has been typed into the input', async () => {
+    const user = userEvent.setup()
+    render(<SearchInput onSelect={vi.fn()} onCreateNew={vi.fn()} />)
+
+    const input = screen.getByPlaceholderText('Search items…')
+    await user.type(input, 'jabl')
+
+    expect(screen.getByRole('button', { name: /clear/i })).toBeInTheDocument()
+  })
+
+  it('clears the input, hides the dropdown, and no longer shows results when clicked', async () => {
+    const user = userEvent.setup()
+    render(<SearchInput onSelect={vi.fn()} onCreateNew={vi.fn()} />)
+
+    const input = screen.getByPlaceholderText('Search items…')
+    await user.type(input, 'jabl')
+
+    await waitFor(() => expect(screen.getByRole('listbox')).toBeInTheDocument())
+    expect(screen.getByText('Jabłka')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /clear/i }))
+
+    expect(input).toHaveValue('')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.queryByText('Jabłka')).not.toBeInTheDocument()
+  })
+})
