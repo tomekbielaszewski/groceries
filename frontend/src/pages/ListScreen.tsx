@@ -219,7 +219,7 @@ const ListScreen: FC = () => {
       {/* Header */}
       <div className="px-3 pt-3 pb-2 border-b border-border">
         <div className="flex items-center gap-2">
-          <button onClick={() => { exitShoppingMode(); navigate('/') }} aria-label="Back" className="text-gray-400 hover:text-gray-200 transition-colors">
+          <button onClick={() => { exitShoppingMode(); if (!isShoppingMode) navigate('/') }} aria-label="Back" className="text-gray-400 hover:text-gray-200 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>

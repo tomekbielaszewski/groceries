@@ -24,9 +24,11 @@ const store = apiClient as unknown as {
   sessionItems: SessionItem[]
 }
 
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }))
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
-  return { ...actual, useNavigate: () => vi.fn() }
+  return { ...actual, useNavigate: () => mockNavigate }
 })
 
 const renderList = (listId: string) =>
@@ -67,6 +69,7 @@ const makeShop = (id: string, overrides: Partial<Shop> = {}): Shop => ({
 beforeEach(async () => {
   useStore.setState({ shoppingModeShopId: null })
   apiClient.reset()
+  mockNavigate.mockClear()
 })
 
 // ---------------------------------------------------------------------------
@@ -735,6 +738,52 @@ describe('ListScreen — shop picker', () => {
 
     expect(useStore.getState().shoppingModeShopId).toBeNull()
     expect(screen.queryByRole('button', { name: /supermarket/i })).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// back navigation from shopping mode
+// ---------------------------------------------------------------------------
+
+describe('ListScreen — back navigation', () => {
+  it('back in shopping mode returns to the edit view without navigating to lists', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    const shop = makeShop('s1', { name: 'Supermarket' })
+    const item = makeItem('i1', { name: 'Milk' })
+    const li = makeListItem('li1', 'l1', 'i1')
+    store.lists.set(list.id, list)
+    store.shops.set(shop.id, shop)
+    store.items.set(item.id, item)
+    store.listItems.set(li.id, li)
+    store.itemShops.push({ itemId: 'i1', shopId: 's1' })
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /^shop$/i }))
+    await user.click(await screen.findByRole('button', { name: /supermarket/i }))
+    expect(useStore.getState().shoppingModeShopId).toBe('s1')
+
+    mockNavigate.mockClear()
+    await user.click(screen.getByRole('button', { name: /back/i }))
+
+    expect(useStore.getState().shoppingModeShopId).toBeNull()
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  it('back in the edit view navigates to the lists screen', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    store.lists.set(list.id, list)
+
+    renderList('l1')
+
+    await screen.findByRole('heading', { level: 1 })
+
+    mockNavigate.mockClear()
+    await user.click(screen.getByRole('button', { name: /back/i }))
+
+    expect(mockNavigate).toHaveBeenCalledWith('/')
   })
 })
 
