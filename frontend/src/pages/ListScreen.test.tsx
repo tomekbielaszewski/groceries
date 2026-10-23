@@ -455,6 +455,44 @@ describe('ListScreen — rename list', () => {
 })
 
 // ---------------------------------------------------------------------------
+// clone active items
+// ---------------------------------------------------------------------------
+
+describe('ListScreen — clone active items', () => {
+  it('clones only active (not-yet-bought) items into a new list', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    const milk = makeItem('i1', { name: 'Milk' })
+    const eggs = makeItem('i2', { name: 'Eggs' })
+    const active = makeListItem('li1', 'l1', 'i1', { quantity: 2 })
+    const bought = makeListItem('li2', 'l1', 'i2', { state: 'bought' })
+    store.lists.set(list.id, list)
+    store.items.set(milk.id, milk)
+    store.items.set(eggs.id, eggs)
+    store.listItems.set(active.id, active)
+    store.listItems.set(bought.id, bought)
+
+    renderList('l1')
+
+    await screen.findByText('Milk')
+    await user.click(await screen.findByRole('button', { name: /more options/i }))
+    await user.click(await screen.findByRole('button', { name: /clone active items/i }))
+
+    await waitFor(() => {
+      const cloned = [...store.lists.values()].find(l => l.id !== 'l1')
+      expect(cloned).toBeDefined()
+      expect(cloned?.name).toBe('Copy of Test list')
+    })
+
+    const cloned = [...store.lists.values()].find(l => l.id !== 'l1')!
+    const clonedItems = [...store.listItems.values()].filter(li => li.listId === cloned.id)
+    expect(clonedItems.map(li => li.itemId)).toEqual(['i1'])
+    expect(clonedItems[0].state).toBe('active')
+    expect(clonedItems[0].quantity).toBe(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // live updates from remote events (SSE stream)
 // ---------------------------------------------------------------------------
 // A change made in ANOTHER tab arrives here as an event on the SSE stream and

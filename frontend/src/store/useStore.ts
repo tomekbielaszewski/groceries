@@ -38,6 +38,7 @@ interface AppStore {
   upsertList: (list: List) => Promise<void>
   deleteList: (id: string) => Promise<void>
   cloneList: (id: string) => Promise<void>
+  cloneListActive: (id: string) => Promise<void>
   upsertListItem: (li: ListItem) => Promise<void>
   updateListItemState: (id: string, state: 'active' | 'bought') => Promise<void>
   skipShopForListItem: (liId: string, shopId: string) => Promise<void>
@@ -179,6 +180,11 @@ export const useStore = create<AppStore>((set) => ({
 
   cloneList: async (id) => {
     const cloned = await apiClient.cloneList(id)
+    set(state => ({ lists: [...state.lists, cloned] }))
+  },
+
+  cloneListActive: async (id) => {
+    const cloned = await apiClient.cloneListActive(id)
     set(state => ({ lists: [...state.lists, cloned] }))
   },
 

@@ -735,10 +735,18 @@ class ApiClient {
   }
 
   async cloneList(id: string): Promise<List> {
+    return this.cloneListFiltered(id, () => true)
+  }
+
+  async cloneListActive(id: string): Promise<List> {
+    return this.cloneListFiltered(id, li => li.state === 'active')
+  }
+
+  private cloneListFiltered(id: string, include: (li: ListItem) => boolean): List {
     const original = this.lists.get(id)!
     const newId = crypto.randomUUID()
     this.commit({ entityId: newId, type: 'ListCreated', payload: { name: `Copy of ${original.name}` } })
-    const originalItems = [...this.listItems.values()].filter(li => li.listId === id)
+    const originalItems = [...this.listItems.values()].filter(li => li.listId === id && include(li))
     for (const li of originalItems) {
       this.commit({
         entityId: crypto.randomUUID(),

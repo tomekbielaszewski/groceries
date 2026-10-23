@@ -29,6 +29,7 @@ const { mockApi } = vi.hoisted(() => ({
     renameList: vi.fn(),
     deleteList: vi.fn(),
     cloneList: vi.fn(),
+    cloneListActive: vi.fn(),
     getListItemsWithItems: vi.fn(),
     addListItem: vi.fn(),
     setListItemState: vi.fn(),
@@ -333,6 +334,17 @@ describe('useStore — list actions', () => {
 
     await useStore.getState().cloneList('l1')
     expect(mockApi.cloneList).toHaveBeenCalledWith('l1')
+    expect(useStore.getState().lists).toHaveLength(2)
+  })
+
+  it('cloneListActive calls apiClient.cloneListActive and adds to state', async () => {
+    const list: List = { id: 'l1', name: 'List', version: 1, createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' }
+    const cloned: List = { ...list, id: 'l2', name: 'Copy of List' }
+    useStore.setState({ lists: [list] })
+    mockApi.cloneListActive.mockResolvedValue(cloned)
+
+    await useStore.getState().cloneListActive('l1')
+    expect(mockApi.cloneListActive).toHaveBeenCalledWith('l1')
     expect(useStore.getState().lists).toHaveLength(2)
   })
 })
