@@ -662,6 +662,37 @@ describe('ListScreen — shop picker', () => {
       expect(useStore.getState().shoppingModeShopId).toBe('s2')
     })
   })
+
+  it('shows a message when there are no shops to choose from', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    store.lists.set(list.id, list)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /^shop$/i }))
+
+    expect(await screen.findByText(/no shops yet/i)).toBeInTheDocument()
+    expect(useStore.getState().shoppingModeShopId).toBeNull()
+  })
+
+  it('cancel closes the picker without entering shopping mode', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    const shop = makeShop('s1', { name: 'Supermarket' })
+    store.lists.set(list.id, list)
+    store.shops.set(shop.id, shop)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /^shop$/i }))
+    await screen.findByRole('button', { name: /supermarket/i })
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(useStore.getState().shoppingModeShopId).toBeNull()
+    expect(screen.queryByRole('button', { name: /supermarket/i })).not.toBeInTheDocument()
+  })
 })
 
 // ---------------------------------------------------------------------------
