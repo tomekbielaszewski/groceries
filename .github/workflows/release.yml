@@ -55,7 +55,7 @@ jobs:
             VITE_APP_VERSION=${{ github.ref_name }}
             VITE_GIT_SHA=${{ steps.git-sha.outputs.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
 
   release:
     needs: [build-and-push]
