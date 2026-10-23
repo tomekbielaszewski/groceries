@@ -691,6 +691,66 @@ describe('lists', () => {
     const lastSetupLamport = setupEvents.at(-1)!.lamport
     expect(lamports).toEqual([lastSetupLamport + 1, lastSetupLamport + 2, lastSetupLamport + 3])
   })
+
+  it('cloneListActive clones only active items, dropping bought items', async () => {
+    let src!: List
+    let i1!: Item
+    let i2!: Item
+    let i3!: Item
+    await capture(async () => {
+      src = await apiClient.createList('Weekly')
+      i1 = await apiClient.createItem({ name: 'Milk', unit: 'l' }, [], [])
+      i2 = await apiClient.createItem({ name: 'Eggs' }, [], [])
+      i3 = await apiClient.createItem({ name: 'Bread' }, [], [])
+      await apiClient.addListItem({ listId: src.id, itemId: i1.id, state: 'active', quantity: 2, unit: 'l', notes: 'buy two' })
+      await apiClient.addListItem({ listId: src.id, itemId: i2.id, state: 'bought', quantity: 1 })
+      await apiClient.addListItem({ listId: src.id, itemId: i3.id, state: 'active', quantity: 3 })
+    })
+
+    let cloned!: List
+    const events = await capture(async () => {
+      cloned = await apiClient.cloneListActive(src.id)
+    })
+
+    expect(events).toHaveLength(3)
+    const created = events[0]!
+    expectEnvelope(created)
+    expect(created.type).toBe('ListCreated')
+    expect(created.entityId).toBe(cloned.id)
+    expect(created.payload).toEqual({ name: 'Copy of Weekly' })
+    expect(cloned.name).toBe('Copy of Weekly')
+
+    const clonedLis = await apiClient.getListItemsWithItems(cloned.id)
+    expect(clonedLis).toHaveLength(2)
+    expect(clonedLis.map(li => li.itemId).sort()).toEqual([i1.id, i3.id].sort())
+
+    const liEvents = events.slice(1)
+    expect(liEvents.map(e => e.type)).toEqual(['ListItemAdded', 'ListItemAdded'])
+    for (const ev of liEvents) {
+      expectEnvelope(ev)
+      expect(ev.entityId).not.toBe('')
+    }
+    expect(liEvents.map(e => e.entityId).sort()).toEqual(clonedLis.map(li => li.id).sort())
+
+    expect(liEvents.map(e => [e.type, e.payload])).toEqual(expect.arrayContaining([
+      ['ListItemAdded', { listId: cloned.id, itemId: i1.id, state: 'active', quantity: 2, unit: 'l', notes: 'buy two' }],
+      ['ListItemAdded', { listId: cloned.id, itemId: i3.id, state: 'active', quantity: 3 }],
+    ]))
+
+    const milk = clonedLis.find(li => li.itemId === i1.id)
+    const bread = clonedLis.find(li => li.itemId === i3.id)
+    expect(milk).toBeDefined()
+    expect(milk?.state).toBe('active')
+    expect(milk?.quantity).toBe(2)
+    expect(milk?.unit).toBe('l')
+    expect(milk?.notes).toBe('buy two')
+    expect(bread).toBeDefined()
+    expect(bread?.state).toBe('active')
+    expect(bread?.quantity).toBe(3)
+
+    const lamports = events.map(e => e.lamport)
+    expect(lamports).toEqual([...lamports].sort((a, b) => a - b))
+  })
 })
 
 // ── ListItems ──────────────────────────────────────────────────────────────────

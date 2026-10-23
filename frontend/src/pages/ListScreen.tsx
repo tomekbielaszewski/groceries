@@ -74,6 +74,13 @@ const ListScreen: FC = () => {
     navigate(`/list/${cloned.id}`)
   }
 
+  const handleCloneActiveItems = async () => {
+    if (!list) return
+    setMenuOpen(false)
+    const cloned = await apiClient.cloneListActive(list.id)
+    navigate(`/list/${cloned.id}`)
+  }
+
   useEffect(() => {
     if (!id) return
     apiClient.getList(id).then(l => setList(l ?? null))
@@ -243,6 +250,12 @@ const ListScreen: FC = () => {
                       className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
                     >
                       Clone list
+                    </button>
+                    <button
+                      onClick={() => void handleCloneActiveItems()}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+                    >
+                      Clone active items
                     </button>
                     <button
                       onClick={() => void toggleArchive()}
