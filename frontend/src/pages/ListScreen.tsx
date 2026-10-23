@@ -7,6 +7,7 @@ import ItemCard from '../components/ItemCard'
 import SearchInput from '../components/SearchInput'
 import SuggestionsPanel from '../components/SuggestionsPanel'
 import SortToggle from '../components/SortToggle'
+import ShopDot from '../components/ShopDot'
 import { useLiveData } from '../components/useLiveData'
 import { formatISODate } from '../utils/dateUtils'
 
@@ -23,6 +24,7 @@ const ListScreen: FC = () => {
   const menuRef = useRef<HTMLDivElement>(null)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameName, setRenameName] = useState('')
+  const [shopPickerOpen, setShopPickerOpen] = useState(false)
   const [cloneOpen, setCloneOpen] = useState(false)
   const [cloneName, setCloneName] = useState('')
   const [cloneMode, setCloneMode] = useState<'all' | 'active'>('all')
@@ -231,10 +233,7 @@ const ListScreen: FC = () => {
               )}
               {!isArchived && (
                 <button
-                  onClick={() => {
-                    const firstShop = shops[0]
-                    if (firstShop) enterShoppingMode(firstShop.id)
-                  }}
+                  onClick={() => setShopPickerOpen(true)}
                   className="text-xs px-2.5 py-1 bg-green-700 hover:bg-green-600 text-white rounded transition-colors whitespace-nowrap"
                 >
                   Shop
@@ -425,6 +424,41 @@ const ListScreen: FC = () => {
           </div>
         </div>
       )}
+      {shopPickerOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-card border border-border rounded-lg p-4 w-full max-w-sm space-y-3">
+            <h2 className="text-sm font-semibold text-gray-100">Choose a shop</h2>
+            {shops.length === 0 ? (
+              <div className="text-sm text-gray-500 py-2">No shops yet. Add one in Settings.</div>
+            ) : (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                {shops.map(shop => (
+                  <button
+                    key={shop.id}
+                    onClick={() => {
+                      setShopPickerOpen(false)
+                      enterShoppingMode(shop.id)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-surface border border-border rounded-md hover:border-gray-500 text-left transition-colors"
+                  >
+                    <ShopDot color={shop.color} />
+                    <span className="text-sm text-gray-200">{shop.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShopPickerOpen(false)}
+                className="text-xs px-3 py-1.5 border border-border rounded text-gray-400 hover:text-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {cloneOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-card border border-border rounded-lg p-4 w-full max-w-sm space-y-3">
