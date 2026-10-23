@@ -751,6 +751,32 @@ describe('lists', () => {
     const lamports = events.map(e => e.lamport)
     expect(lamports).toEqual([...lamports].sort((a, b) => a - b))
   })
+
+  it('cloneList and cloneListActive accept an explicit name', async () => {
+    const src = await apiClient.createList('Weekly')
+    const i1 = await apiClient.createItem({ name: 'Milk' }, [], [])
+    const i2 = await apiClient.createItem({ name: 'Eggs' }, [], [])
+    await apiClient.addListItem({ listId: src.id, itemId: i1.id, state: 'active' })
+    await apiClient.addListItem({ listId: src.id, itemId: i2.id, state: 'bought' })
+
+    let full!: List
+    const fullEvents = await capture(async () => {
+      full = await apiClient.cloneList(src.id, 'Full copy')
+    })
+    expect(fullEvents[0]!.payload).toEqual({ name: 'Full copy' })
+    expect(full.name).toBe('Full copy')
+    expect((await apiClient.getListItemsWithItems(full.id))).toHaveLength(2)
+
+    let active!: List
+    const activeEvents = await capture(async () => {
+      active = await apiClient.cloneListActive(src.id, 'Active copy')
+    })
+    expect(activeEvents[0]!.payload).toEqual({ name: 'Active copy' })
+    expect(active.name).toBe('Active copy')
+    const activeItems = await apiClient.getListItemsWithItems(active.id)
+    expect(activeItems).toHaveLength(1)
+    expect(activeItems[0]!.itemId).toBe(i1.id)
+  })
 })
 
 // ── ListItems ──────────────────────────────────────────────────────────────────

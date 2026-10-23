@@ -37,8 +37,8 @@ interface AppStore {
   createOneTimeItem: (item: Item, shopIds: string[], tagIds: string[]) => Promise<void>
   upsertList: (list: List) => Promise<void>
   deleteList: (id: string) => Promise<void>
-  cloneList: (id: string) => Promise<void>
-  cloneListActive: (id: string) => Promise<void>
+  cloneList: (id: string, name?: string) => Promise<void>
+  cloneListActive: (id: string, name?: string) => Promise<void>
   upsertListItem: (li: ListItem) => Promise<void>
   updateListItemState: (id: string, state: 'active' | 'bought') => Promise<void>
   skipShopForListItem: (liId: string, shopId: string) => Promise<void>
@@ -178,13 +178,13 @@ export const useStore = create<AppStore>((set) => ({
     set(state => ({ lists: state.lists.filter(l => l.id !== id) }))
   },
 
-  cloneList: async (id) => {
-    const cloned = await apiClient.cloneList(id)
+  cloneList: async (id, name) => {
+    const cloned = await apiClient.cloneList(id, name)
     set(state => ({ lists: [...state.lists, cloned] }))
   },
 
-  cloneListActive: async (id) => {
-    const cloned = await apiClient.cloneListActive(id)
+  cloneListActive: async (id, name) => {
+    const cloned = await apiClient.cloneListActive(id, name)
     set(state => ({ lists: [...state.lists, cloned] }))
   },
 

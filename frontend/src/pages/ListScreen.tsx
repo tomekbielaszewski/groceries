@@ -9,6 +9,7 @@ import SuggestionsPanel from '../components/SuggestionsPanel'
 import SortToggle from '../components/SortToggle'
 import ShopDot from '../components/ShopDot'
 import { useLiveData } from '../components/useLiveData'
+import { formatISODate } from '../utils/dateUtils'
 
 const ListScreen: FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -24,6 +25,9 @@ const ListScreen: FC = () => {
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameName, setRenameName] = useState('')
   const [shopPickerOpen, setShopPickerOpen] = useState(false)
+  const [cloneOpen, setCloneOpen] = useState(false)
+  const [cloneName, setCloneName] = useState('')
+  const [cloneMode, setCloneMode] = useState<'all' | 'active'>('all')
   const [oneTimeNames, setOneTimeNames] = useState<Set<string>>(new Set())
 
   const sortMode: SortMode = (id ? sortModes[id] : undefined) ?? 'date'
@@ -72,14 +76,25 @@ const ListScreen: FC = () => {
   const handleCloneList = async () => {
     if (!list) return
     setMenuOpen(false)
-    const cloned = await apiClient.cloneList(list.id)
-    navigate(`/list/${cloned.id}`)
+    setCloneMode('all')
+    setCloneName(formatISODate(new Date()))
+    setCloneOpen(true)
   }
 
   const handleCloneActiveItems = async () => {
     if (!list) return
     setMenuOpen(false)
-    const cloned = await apiClient.cloneListActive(list.id)
+    setCloneMode('active')
+    setCloneName(formatISODate(new Date()))
+    setCloneOpen(true)
+  }
+
+  const saveClone = async () => {
+    if (!list || !cloneName.trim()) return
+    const cloned = cloneMode === 'active'
+      ? await apiClient.cloneListActive(list.id, cloneName.trim())
+      : await apiClient.cloneList(list.id, cloneName.trim())
+    setCloneOpen(false)
     navigate(`/list/${cloned.id}`)
   }
 
@@ -409,7 +424,6 @@ const ListScreen: FC = () => {
           </div>
         </div>
       )}
-
       {shopPickerOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-card border border-border rounded-lg p-4 w-full max-w-sm space-y-3">
@@ -439,6 +453,40 @@ const ListScreen: FC = () => {
                 className="text-xs px-3 py-1.5 border border-border rounded text-gray-400 hover:text-gray-200 transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cloneOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-card border border-border rounded-lg p-4 w-full max-w-sm space-y-3">
+            <h2 className="text-sm font-semibold text-gray-100">{cloneMode === 'active' ? 'Clone active items' : 'Clone list'}</h2>
+            <input
+              autoFocus
+              type="text"
+              aria-label="List name"
+              value={cloneName}
+              onChange={e => setCloneName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') void saveClone()
+                if (e.key === 'Escape') setCloneOpen(false)
+              }}
+              className="w-full bg-transparent border border-border rounded px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-gray-500"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setCloneOpen(false)}
+                className="text-xs px-3 py-1.5 border border-border rounded text-gray-400 hover:text-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void saveClone()}
+                className="text-xs px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors"
+              >
+                Save
               </button>
             </div>
           </div>
