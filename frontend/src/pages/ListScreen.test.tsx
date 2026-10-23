@@ -6,6 +6,7 @@ import { vi } from 'vitest'
 import ListScreen from './ListScreen'
 import { apiClient } from '../api/client'
 import { useStore } from '../store/useStore'
+import { formatISODate } from '../utils/dateUtils'
 import type { Item, List, ListItem, Shop, Tag, ItemShop, ItemTag, ListItemSkippedShop, ShoppingSession, SessionItem } from '../types'
 import type { ServerEvent } from '../api/transport'
 import type { AppEvent } from '../types/event'
@@ -455,11 +456,47 @@ describe('ListScreen — rename list', () => {
 })
 
 // ---------------------------------------------------------------------------
-// clone active items
+// clone list / clone active items (prompt for a new name)
 // ---------------------------------------------------------------------------
 
-describe('ListScreen — clone active items', () => {
-  it('clones only active (not-yet-bought) items into a new list', async () => {
+describe('ListScreen — clone', () => {
+  it('clone list prompts for a name and clones all items', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    const milk = makeItem('i1', { name: 'Milk' })
+    const eggs = makeItem('i2', { name: 'Eggs' })
+    const active = makeListItem('li1', 'l1', 'i1', { quantity: 2 })
+    const bought = makeListItem('li2', 'l1', 'i2', { state: 'bought' })
+    store.lists.set(list.id, list)
+    store.items.set(milk.id, milk)
+    store.items.set(eggs.id, eggs)
+    store.listItems.set(active.id, active)
+    store.listItems.set(bought.id, bought)
+
+    renderList('l1')
+
+    await screen.findByText('Milk')
+    await user.click(await screen.findByRole('button', { name: /more options/i }))
+    await user.click(await screen.findByRole('button', { name: /clone list/i }))
+
+    const input = await screen.findByRole('textbox', { name: /list name/i })
+    expect((input as HTMLInputElement).value).toBe(formatISODate(new Date()))
+    await user.clear(input)
+    await user.type(input, 'Next week')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => {
+      const cloned = [...store.lists.values()].find(l => l.id !== 'l1')
+      expect(cloned).toBeDefined()
+      expect(cloned?.name).toBe('Next week')
+    })
+
+    const cloned = [...store.lists.values()].find(l => l.id !== 'l1')!
+    const clonedItems = [...store.listItems.values()].filter(li => li.listId === cloned.id)
+    expect(clonedItems.map(li => li.itemId).sort()).toEqual(['i1', 'i2'])
+  })
+
+  it('clone active items prompts for a name and clones only active items', async () => {
     const user = userEvent.setup()
     const list = makeList('l1')
     const milk = makeItem('i1', { name: 'Milk' })
@@ -478,10 +515,16 @@ describe('ListScreen — clone active items', () => {
     await user.click(await screen.findByRole('button', { name: /more options/i }))
     await user.click(await screen.findByRole('button', { name: /clone active items/i }))
 
+    const input = await screen.findByRole('textbox', { name: /list name/i })
+    expect((input as HTMLInputElement).value).toBe(formatISODate(new Date()))
+    await user.clear(input)
+    await user.type(input, 'Remaining items')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
     await waitFor(() => {
       const cloned = [...store.lists.values()].find(l => l.id !== 'l1')
       expect(cloned).toBeDefined()
-      expect(cloned?.name).toBe('Copy of Test list')
+      expect(cloned?.name).toBe('Remaining items')
     })
 
     const cloned = [...store.lists.values()].find(l => l.id !== 'l1')!

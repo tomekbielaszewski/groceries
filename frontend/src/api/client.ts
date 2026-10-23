@@ -734,18 +734,18 @@ class ApiClient {
     this.commit({ entityId: id, type: 'ListDeleted', payload: { deletedAt: this.nowIso() } })
   }
 
-  async cloneList(id: string): Promise<List> {
-    return this.cloneListFiltered(id, () => true)
+  async cloneList(id: string, name?: string): Promise<List> {
+    return this.cloneListFiltered(id, () => true, name)
   }
 
-  async cloneListActive(id: string): Promise<List> {
-    return this.cloneListFiltered(id, li => li.state === 'active')
+  async cloneListActive(id: string, name?: string): Promise<List> {
+    return this.cloneListFiltered(id, li => li.state === 'active', name)
   }
 
-  private cloneListFiltered(id: string, include: (li: ListItem) => boolean): List {
+  private cloneListFiltered(id: string, include: (li: ListItem) => boolean, name?: string): List {
     const original = this.lists.get(id)!
     const newId = crypto.randomUUID()
-    this.commit({ entityId: newId, type: 'ListCreated', payload: { name: `Copy of ${original.name}` } })
+    this.commit({ entityId: newId, type: 'ListCreated', payload: { name: name ?? `Copy of ${original.name}` } })
     const originalItems = [...this.listItems.values()].filter(li => li.listId === id && include(li))
     for (const li of originalItems) {
       this.commit({

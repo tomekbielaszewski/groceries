@@ -332,19 +332,19 @@ describe('useStore — list actions', () => {
     useStore.setState({ lists: [list] })
     mockApi.cloneList.mockResolvedValue(cloned)
 
-    await useStore.getState().cloneList('l1')
-    expect(mockApi.cloneList).toHaveBeenCalledWith('l1')
+    await useStore.getState().cloneList('l1', 'Copy of List')
+    expect(mockApi.cloneList).toHaveBeenCalledWith('l1', 'Copy of List')
     expect(useStore.getState().lists).toHaveLength(2)
   })
 
   it('cloneListActive calls apiClient.cloneListActive and adds to state', async () => {
     const list: List = { id: 'l1', name: 'List', version: 1, createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' }
-    const cloned: List = { ...list, id: 'l2', name: 'Copy of List' }
+    const cloned: List = { ...list, id: 'l2', name: 'Active copy' }
     useStore.setState({ lists: [list] })
     mockApi.cloneListActive.mockResolvedValue(cloned)
 
-    await useStore.getState().cloneListActive('l1')
-    expect(mockApi.cloneListActive).toHaveBeenCalledWith('l1')
+    await useStore.getState().cloneListActive('l1', 'Active copy')
+    expect(mockApi.cloneListActive).toHaveBeenCalledWith('l1', 'Active copy')
     expect(useStore.getState().lists).toHaveLength(2)
   })
 })
