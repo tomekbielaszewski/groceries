@@ -6,6 +6,7 @@ import { vi } from 'vitest'
 import ListScreen from './ListScreen'
 import { apiClient } from '../api/client'
 import { useStore } from '../store/useStore'
+import { formatISODate } from '../utils/dateUtils'
 import type { Item, List, ListItem, Shop, Tag, ItemShop, ItemTag, ListItemSkippedShop, ShoppingSession, SessionItem } from '../types'
 import type { ServerEvent } from '../api/transport'
 import type { AppEvent } from '../types/event'
@@ -479,7 +480,7 @@ describe('ListScreen — clone', () => {
     await user.click(await screen.findByRole('button', { name: /clone list/i }))
 
     const input = await screen.findByRole('textbox', { name: /list name/i })
-    expect((input as HTMLInputElement).value).toBe('Copy of Test list')
+    expect((input as HTMLInputElement).value).toBe(formatISODate(new Date()))
     await user.clear(input)
     await user.type(input, 'Next week')
     await user.click(screen.getByRole('button', { name: /^save$/i }))
@@ -515,7 +516,7 @@ describe('ListScreen — clone', () => {
     await user.click(await screen.findByRole('button', { name: /clone active items/i }))
 
     const input = await screen.findByRole('textbox', { name: /list name/i })
-    expect((input as HTMLInputElement).value).toBe('Copy of Test list')
+    expect((input as HTMLInputElement).value).toBe(formatISODate(new Date()))
     await user.clear(input)
     await user.type(input, 'Remaining items')
     await user.click(screen.getByRole('button', { name: /^save$/i }))

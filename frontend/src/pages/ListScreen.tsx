@@ -8,6 +8,7 @@ import SearchInput from '../components/SearchInput'
 import SuggestionsPanel from '../components/SuggestionsPanel'
 import SortToggle from '../components/SortToggle'
 import { useLiveData } from '../components/useLiveData'
+import { formatISODate } from '../utils/dateUtils'
 
 const ListScreen: FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -74,7 +75,7 @@ const ListScreen: FC = () => {
     if (!list) return
     setMenuOpen(false)
     setCloneMode('all')
-    setCloneName(`Copy of ${list.name}`)
+    setCloneName(formatISODate(new Date()))
     setCloneOpen(true)
   }
 
@@ -82,7 +83,7 @@ const ListScreen: FC = () => {
     if (!list) return
     setMenuOpen(false)
     setCloneMode('active')
-    setCloneName(`Copy of ${list.name}`)
+    setCloneName(formatISODate(new Date()))
     setCloneOpen(true)
   }
 
