@@ -617,6 +617,7 @@ describe('ListScreen — live updates from remote events', () => {
 
     // Enter shopping mode: the bought item is in the struck-through Bought section.
     await user.click(await screen.findByRole('button', { name: /^shop$/i }))
+    await user.click(await screen.findByRole('button', { name: /supermarket/i }))
     await screen.findByText('Milk')
 
     // The server delivers a delayed echo of the ORIGINAL ListItemAdded event
@@ -628,6 +629,38 @@ describe('ListScreen — live updates from remote events', () => {
     // The stale echo must NOT reset the item to active (the reported flicker).
     expect(store.listItems.get(li.id)!.state).toBe('bought')
     unsubscribe()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// shop picker when starting shopping
+// ---------------------------------------------------------------------------
+
+describe('ListScreen — shop picker', () => {
+  it('shows a list of shops to choose from and enters the selected one', async () => {
+    const user = userEvent.setup()
+    const list = makeList('l1')
+    const auchan = makeShop('s1', { name: 'Auchan' })
+    const lidl = makeShop('s2', { name: 'Lidl' })
+    store.lists.set(list.id, list)
+    store.shops.set(auchan.id, auchan)
+    store.shops.set(lidl.id, lidl)
+
+    renderList('l1')
+
+    await user.click(await screen.findByRole('button', { name: /^shop$/i }))
+
+    // Both shops are offered, and nothing is preselected yet.
+    expect(await screen.findByRole('button', { name: /auchan/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /lidl/i })).toBeInTheDocument()
+    expect(useStore.getState().shoppingModeShopId).toBeNull()
+
+    // Choosing the second shop (not the default first one) enters shopping mode there.
+    await user.click(screen.getByRole('button', { name: /lidl/i }))
+
+    await waitFor(() => {
+      expect(useStore.getState().shoppingModeShopId).toBe('s2')
+    })
   })
 })
 
@@ -654,6 +687,7 @@ describe('ListScreen — purchase history', () => {
     // Enter shopping mode by clicking the "Shop" button
     const shopBtn = await screen.findByRole('button', { name: /^shop$/i })
     await user.click(shopBtn)
+    await user.click(await screen.findByRole('button', { name: /supermarket/i }))
 
     // The item should now appear in shopping mode
     const milkBtn = await screen.findByText('Milk')
@@ -685,6 +719,7 @@ describe('ListScreen — purchase history', () => {
 
     const shopBtn = await screen.findByRole('button', { name: /^shop$/i })
     await user.click(shopBtn)
+    await user.click(await screen.findByRole('button', { name: /supermarket/i }))
 
     const breadBtn = await screen.findByText('Bread')
     await user.click(breadBtn)
@@ -714,6 +749,7 @@ describe('ListScreen — purchase history', () => {
 
     const shopBtn = await screen.findByRole('button', { name: /^shop$/i })
     await user.click(shopBtn)
+    await user.click(await screen.findByRole('button', { name: /supermarket/i }))
 
     // The skip button is not directly reachable via swipe in tests — the
     // ShoppingCard renders an `onSkip` prop that gets called by the swipe handler.
@@ -761,6 +797,7 @@ describe('ListScreen — purchase history', () => {
 
     const shopBtn = await screen.findByRole('button', { name: /^shop$/i })
     await user.click(shopBtn)
+    await user.click(await screen.findByRole('button', { name: /shop s1/i }))
 
     // Buy first item
     await user.click(await screen.findByText('Milk'))
