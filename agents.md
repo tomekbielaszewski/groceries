@@ -2,7 +2,7 @@
 
 Repeatable workflow for shipping a feature or fix in this repo.
 
-## Standard flow
+## Standard flow (do this for every task)
 
 1. **Start from fresh master**
    - `git checkout master && git pull`
@@ -22,13 +22,18 @@ Repeatable workflow for shipping a feature or fix in this repo.
    - `git push -u origin <branch>`
    - `gh pr create --base master --head <branch> --title "…" --body "…"`
 
-5. **Publish a dev image (when asked)**
-   - Apply the `publish-dev-image` label to the PR to trigger the `Dev image` workflow:
-     `gh api repos/tomekbielaszewski/groceries/issues/<PR> -f 'labels[]=publish-dev-image'`
-   - To re-trigger after new commits, remove then re-add the label:
-     `gh api -X DELETE repos/.../issues/<PR>/labels/publish-dev-image`
-     `gh api repos/.../issues/<PR>/labels -f 'labels[]=publish-dev-image'`
+## Publish to dev — ONLY when the user explicitly requests it
 
-6. **Notify**
-   - Watch the run, then ping the user via ntfy:
-     `curl -H "Title: OpenCode Alert" -H "Tags: laptop,gear" -d "<message>" ntfy.sh/tbw-opencode`
+Do **not** apply the label or notify the user unless the user asks to
+"publish to dev" / "label with image publish" (or similar). Otherwise stop
+after opening the PR.
+
+When requested:
+
+1. Apply the `publish-dev-image` label to trigger the `Dev image` workflow:
+   `gh api repos/tomekbielaszewski/groceries/issues/<PR> -f 'labels[]=publish-dev-image'`
+2. To re-trigger after new commits, remove then re-add the label:
+   `gh api -X DELETE repos/.../issues/<PR>/labels/publish-dev-image`
+   `gh api repos/.../issues/<PR>/labels -f 'labels[]=publish-dev-image'`
+3. Watch the run, then notify via ntfy:
+   `curl -H "Title: OpenCode Alert" -H "Tags: laptop,gear" -d "<message>" ntfy.sh/tbw-opencode`
