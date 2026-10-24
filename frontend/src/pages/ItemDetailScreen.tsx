@@ -106,15 +106,28 @@ const ItemDetailScreen: FC = () => {
       itemId = id!
     }
 
-    // Cascade unit change to list items that still carry the old default unit.
-    // List items with a user-overridden unit (different from the old default) are left untouched.
-    if (!isNew && oldUnit !== newUnit) {
-      const affected = await apiClient.getListItemsByItemId(itemId)
-      await Promise.all(
-        affected
-          .filter(li => li.unit === oldUnit)
-          .map(li => apiClient.changeListItemQuantity(li.id, li.quantity, newUnit))
-      )
+    // Cascade unit/quantity changes to list items that still carry the old
+    // default values. List items with a user-overridden unit or quantity
+    // (different from the old default) are left untouched.
+    if (!isNew) {
+      const oldDefaultQty = item?.defaultQuantity
+      const unitChanged = oldUnit !== newUnit
+      const qtyChanged = oldDefaultQty !== parsedQty
+      if (unitChanged || qtyChanged) {
+        const affected = await apiClient.getListItemsByItemId(itemId)
+        await Promise.all(
+          affected.map(li => {
+            const cascadeUnit = unitChanged && li.unit === oldUnit
+            const cascadeQty = qtyChanged && li.quantity === oldDefaultQty
+            if (!cascadeUnit && !cascadeQty) return Promise.resolve()
+            return apiClient.changeListItemQuantity(
+              li.id,
+              cascadeQty ? parsedQty : li.quantity,
+              cascadeUnit ? newUnit : li.unit,
+            )
+          })
+        )
+      }
     }
 
     // If coming from list add flow, add to that list
