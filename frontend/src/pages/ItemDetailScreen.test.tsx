@@ -423,6 +423,66 @@ describe('ItemDetailScreen — unit change cascades to list items', () => {
 })
 
 // ---------------------------------------------------------------------------
+// default amount change cascades to list items
+// ---------------------------------------------------------------------------
+
+describe('ItemDetailScreen — default amount change cascades to list items', () => {
+  it('updates listItem quantity when the item default amount is changed', async () => {
+    const now = new Date().toISOString()
+    const user = userEvent.setup()
+
+    store.items.set('i1', { id: 'i1', name: 'Flour', unit: 'kg', defaultQuantity: 1, version: 1, createdAt: now, updatedAt: now })
+    store.listItems.set('li1', { id: 'li1', listId: 'list1', itemId: 'i1', state: 'active', quantity: 1, unit: 'kg', version: 1, addedAt: now, updatedAt: now })
+
+    renderItem('i1')
+
+    await waitFor(() => {
+      expect((screen.getByPlaceholderText('or type custom…') as HTMLInputElement).value).toBe('kg')
+    })
+
+    // Change the default amount from 1 to 3
+    const amountInput = await screen.findByDisplayValue('1')
+    await user.clear(amountInput)
+    await user.type(amountInput, '3')
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    // The listItem that snapshotted the old default amount should be updated
+    await waitFor(() => {
+      const updated = store.listItems.get('li1')
+      expect(updated?.quantity).toBe(3)
+    })
+  })
+
+  it('does not touch listItems whose quantity was explicitly overridden', async () => {
+    const now = new Date().toISOString()
+    const user = userEvent.setup()
+
+    store.items.set('i2', { id: 'i2', name: 'Sugar', unit: 'kg', defaultQuantity: 1, version: 1, createdAt: now, updatedAt: now })
+    // This list item has a user-chosen quantity 2 — different from item default 1
+    store.listItems.set('li2', { id: 'li2', listId: 'list1', itemId: 'i2', state: 'active', quantity: 2, unit: 'kg', version: 1, addedAt: now, updatedAt: now })
+
+    renderItem('i2')
+
+    await waitFor(() => {
+      expect((screen.getByPlaceholderText('or type custom…') as HTMLInputElement).value).toBe('kg')
+    })
+
+    const amountInput = await screen.findByDisplayValue('1')
+    await user.clear(amountInput)
+    await user.type(amountInput, '3')
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    // Quantity 2 was not the old default, so it must not be changed
+    await waitFor(() => {
+      const untouched = store.listItems.get('li2')
+      expect(untouched?.quantity).toBe(2)
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
 // purchase history table
 // ---------------------------------------------------------------------------
 
