@@ -491,21 +491,21 @@ describe('connectStream', () => {
     const { response, feed } = sseResponse()
     const fetchMock = mockFetch([
       { method: 'GET', url: '/api/events/stream?since=0', response },
-      { method: 'GET', url: '/api/events?since=7', response: jsonResponse({ events: [], lastSeq: 7 }) },
-      { method: 'POST', url: '/api/events', response: jsonResponse({ accepted: 0, duplicates: 0, lastSeq: 7 }) },
+      { method: 'GET', url: '/api/events?since=1', response: jsonResponse({ events: [], lastSeq: 1 }) },
+      { method: 'POST', url: '/api/events', response: jsonResponse({ accepted: 0, duplicates: 0, lastSeq: 1 }) },
     ])
     const received: AppEvent[] = []
     apiClient.subscribe(e => received.push(e))
 
     const unsubscribe = apiClient.connectStream()
-    feed(remoteEvent('ShopCreated', 'shop-live', { name: 'Live', color: '#123456' }, 7, 50))
+    feed(remoteEvent('ShopCreated', 'shop-live', { name: 'Live', color: '#123456' }, 1, 50))
     await tick()
     expect(received[0]!.lamport).toBe(50)
     expect(await apiClient.getShops()).toHaveLength(1)
 
-    // lastSeq advanced to 7: the next pull skips everything before seq 7.
+    // lastSeq advanced to 1: the next pull skips everything before seq 1.
     await apiClient.loadData()
-    expect(getUrls(fetchMock).filter(u => u.includes('/api/events?since=7'))).toHaveLength(1)
+    expect(getUrls(fetchMock).filter(u => u.includes('/api/events?since=1'))).toHaveLength(1)
 
     // Merged lamport: the next local mutation stamps > 50.
     await apiClient.createShop({ name: 'Local', color: '#000000' })
@@ -795,14 +795,14 @@ describe('connectStream — resilient fallback (polling + reconnect)', () => {
     const { response, feed, error } = sseResponse()
     const fetchMock = mockFetch([
       { method: 'GET', url: '/api/events/stream?since=0', response },
-      { method: 'GET', url: '/api/events?since=7', response: jsonResponse({ events: [], lastSeq: 7 }) },
+      { method: 'GET', url: '/api/events?since=1', response: jsonResponse({ events: [], lastSeq: 1 }) },
     ])
     const received: AppEvent[] = []
     apiClient.subscribe(e => received.push(e))
 
     const unsubscribe = apiClient.connectStream()
     await vi.advanceTimersByTimeAsync(1)
-    feed(remoteEvent('ListCreated', 'list-live-err', { name: 'Live Then Broken' }, 7, 12))
+    feed(remoteEvent('ListCreated', 'list-live-err', { name: 'Live Then Broken' }, 1, 12))
     await vi.advanceTimersByTimeAsync(1)
     expect(received).toHaveLength(1) // event applied while live
 
@@ -812,7 +812,7 @@ describe('connectStream — resilient fallback (polling + reconnect)', () => {
     // polling resumes from the lastSeq the stream reached
     await vi.advanceTimersByTimeAsync(POLL_INTERVAL)
     expect(pollUrls(fetchMock)).toHaveLength(1)
-    expect(pollUrls(fetchMock)[0]).toContain('since=7')
+    expect(pollUrls(fetchMock)[0]).toContain('since=1')
     unsubscribe()
   })
 
@@ -838,7 +838,8 @@ describe('connectStream — resilient fallback (polling + reconnect)', () => {
 describe('localStorage persistence (offline-first)', () => {
   it('persists entities, lastSeq, and an empty outbox after a mutation auto-syncs', async () => {
     mockFetch([
-      { method: 'POST', url: '/api/events', response: jsonResponse({ accepted: 1, duplicates: 0, lastSeq: 5 }) },
+      { method: 'POST', url: '/api/events', response: jsonResponse({ accepted: 1, duplicates: 0, lastSeq: 1 }) },
+      { method: 'GET', url: '/api/events?since=0', response: jsonResponse({ events: [], lastSeq: 1 }) },
     ])
 
     const shop = await apiClient.createShop({ name: 'S', color: '#00ff00' })
@@ -851,7 +852,7 @@ describe('localStorage persistence (offline-first)', () => {
     expect(snap.shops).toEqual([
       expect.objectContaining({ id: shop.id, name: 'S', color: '#00ff00', version: 1 }),
     ])
-    expect(snap.lastSeq).toBe(5)
+    expect(snap.lastSeq).toBe(1)
     expect(snap.outbox).toEqual([])
     expect(typeof snap.clientId).toBe('string')
     expect(snap.clientId.length).toBeGreaterThan(0)
@@ -952,6 +953,7 @@ describe('localStorage persistence (offline-first)', () => {
     // the outbox survived the failed boot: a later sync() POSTs it with the same id
     const fetchMock = mockFetch([
       { method: 'POST', url: '/api/events', response: jsonResponse({ accepted: 1, duplicates: 0, lastSeq: 25 }) },
+      { method: 'GET', url: '/api/events?since=24', response: jsonResponse({ events: [{ ...outboxEvt, seq: 25 }], lastSeq: 25 }) },
     ])
     await apiClient.sync()
 
@@ -1097,11 +1099,24 @@ describe('resync', () => {
   it('keeps existing subscribers: listeners keep receiving applied events during the pull and afterwards', async () => {
     const shopEvt = remoteEvent('ShopCreated', 'shop-r', { name: 'Remote Shop', color: '#00ff00' }, 1, 4)
     const { response } = sseResponse()
-    mockFetch([
-      { method: 'POST', url: '/api/events', response: jsonResponse({ accepted: 0, duplicates: 0, lastSeq: 1 }) },
-      { method: 'GET', url: '/api/events?since=0', response: jsonResponse({ events: [shopEvt], lastSeq: 1 }) },
-      { method: 'GET', url: '/api/events/stream?since=1', response },
-    ])
+    let pulls = 0
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit): Promise<Response> => {
+      const u = String(url)
+      const method = init?.method ?? 'GET'
+      if (method === 'POST') return jsonResponse({ accepted: 0, duplicates: 0, lastSeq: 1 })
+      if (u === '/api/events?since=0') {
+        pulls++
+        // The auto-sync pull right after the local commit must not yet see the
+        // remote event; only the resync's full replay returns it.
+        return pulls === 1
+          ? jsonResponse({ events: [], lastSeq: 0 })
+          : jsonResponse({ events: [shopEvt], lastSeq: 1 })
+      }
+      if (u === '/api/events?since=1') return jsonResponse({ events: [], lastSeq: 1 })
+      if (u.includes('/api/events/stream')) return response
+      throw new Error(`Unexpected fetch: ${method} ${u}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
     const received: AppEvent[] = []
     apiClient.subscribe(e => received.push(e))
 

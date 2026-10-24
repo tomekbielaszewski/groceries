@@ -6,12 +6,9 @@ import type { ServerEvent } from './transport'
 // ─────────────────────────────────────────────────────────────────────────────
 // Sync architecture flaw reproductions.
 //
-// These tests are INTENTIONALLY RED. Each one pins the *correct* behaviour of
-// the event-based sync flow; today the implementation fails them, proving the
-// flaw. See SYNC-ARCHITECTURE-REVIEW.md for the full write-up.
-//
-// Fixing these means changing the implementation (and then these turn green).
-// They are committed on their own branch/PR for review, NOT merged to master.
+// Each one pins the *correct* behaviour of the event-based sync flow; the
+// implementation has been fixed to satisfy them. See SYNC-ARCHITECTURE-REVIEW.md
+// for the full write-up.
 // ─────────────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {

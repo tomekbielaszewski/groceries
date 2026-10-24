@@ -1,8 +1,10 @@
 package handlers_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -13,9 +15,9 @@ import (
 // ─────────────────────────────────────────────────────────────────────────────
 // Sync architecture flaw reproductions (backend side).
 //
-// These tests are INTENTIONALLY RED. Each pins the *correct* behaviour of the
-// event pipeline; today the implementation fails them, proving the flaw.
-// See SYNC-ARCHITECTURE-REVIEW.md for the full write-up.
+// Each test pins the *correct* behaviour of the event pipeline. The
+// implementation has been fixed to satisfy them; see SYNC-ARCHITECTURE-REVIEW.md
+// for the original write-up.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // FLAW: PublishEvents records events in the log (InsertEvents commits its own
@@ -53,20 +55,27 @@ func TestPublish_RetryAfterProjectionFailureMustProject(t *testing.T) {
 	hub := handlers.NewHub()
 	srv := newTestServer(t, db, hub)
 
-	// First attempt: projection fails, but the event is committed to the log.
+	// First attempt: projection fails (payload field has the wrong type).
+	// Because record + project are atomic, this leaves nothing in the log and
+	// does not "burn" the event id.
 	bad := makeEvent(t, models.EventShopCreated, "shop-1", map[string]any{"name": 123, "color": "red"})
-	postEvents(t, srv, bad)
-
-	// A client retry of the same event id is classified as a duplicate and
-	// skips projection entirely.
 	status, _ := postEvents(t, srv, bad)
-	require.Equal(t, 200, status, "retrying a known id should be an idempotent success")
+	require.Equal(t, 500, status, "a projection failure must be reported as an error")
 
-	// Correct: the committed event must eventually be projected. Today it never
-	// is, so the client and the server stay permanently out of sync.
+	// The failed event must not be committed to the log.
+	er := doGetEvents(t, srv, 0, 0)
+	require.Empty(t, er.Events, "a projection failure must not commit the event to the log")
+
+	// A corrected retry of the same id must now project: the failed attempt
+	// left no committed-but-unprojected event behind for the retry to skip.
+	good := bad
+	good.Payload = json.RawMessage(`{"name":"Corner","color":"red"}`)
+	status, _ = postEvents(t, srv, good)
+	require.Equal(t, 200, status, "a corrected retry of a previously failed id must succeed")
+
 	var count int
 	require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM shops WHERE id = 'shop-1'`).Scan(&count))
-	require.Equal(t, 1, count, "a committed event must eventually be projected (retry never re-projects today)")
+	require.Equal(t, 1, count, "a corrected retry must be projected")
 }
 
 // FLAW: the Hub drops events for slow subscribers (non-blocking send into a
@@ -89,19 +98,42 @@ func TestHub_MustNotDropEventsWhenBufferIsFull(t *testing.T) {
 		})
 	}
 
+	// Delivery is asynchronous (a forwarder drains the subscriber's queue), so
+	// read with a deadline instead of a racy non-blocking drain.
 	delivered := 0
-drain:
-	for {
+	timeout := time.After(5 * time.Second)
+	for delivered < total {
 		select {
 		case _, ok := <-ch:
 			if !ok {
-				break drain
+				t.Fatalf("subscriber channel closed after %d/%d events", delivered, total)
 			}
 			delivered++
-		default:
-			break drain
+		case <-timeout:
+			t.Fatalf("only %d/%d events delivered", delivered, total)
 		}
 	}
+}
 
-	require.Equal(t, total, delivered, "publish must not silently drop events for a subscriber")
+// FLAW: live hub events carried no seq (`json:"seq,omitempty"` omits Seq == 0),
+// so the client cursor became NaN. The server must broadcast events WITH their
+// DB-assigned seq so subscribers can advance their cursor.
+func TestPublish_BroadcastsEventsWithAssignedSeq(t *testing.T) {
+	db := newTestDB(t)
+	hub := handlers.NewHub()
+	srv := newTestServer(t, db, hub)
+
+	ch := hub.Subscribe()
+	defer hub.Unsubscribe(ch)
+
+	e := makeEvent(t, models.EventShopCreated, "shop-1", map[string]any{"name": "Corner", "color": "red"})
+	doPublish(t, srv, e)
+
+	select {
+	case got := <-ch:
+		require.Equal(t, e.ID, got.ID, "live broadcast must carry the committed event")
+		require.NotZero(t, got.Seq, "live broadcast must carry the DB-assigned seq")
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for live event on the hub")
+	}
 }

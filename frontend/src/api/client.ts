@@ -513,9 +513,26 @@ class ApiClient {
   }
 
   async sync(): Promise<void> {
-    const resp = await publishPendingEvents(this.outbox)
+    const since = this.lastSeq
+    const hadPending = this.outbox.length > 0
+    await publishPendingEvents(this.outbox)
     this.outbox = []
-    this.lastSeq = Math.max(this.lastSeq, resp.lastSeq)
+    if (hadPending) {
+      // We just advanced the server's cursor with our own events, so events
+      // published by other clients between our old cursor and the server's new
+      // position must be pulled and applied, not skipped. Pull-and-apply from
+      // the pre-sync cursor; our own just-published events are deduped by
+      // appliedIds. We never advance lastSeq straight from resp.lastSeq.
+      try {
+        const { events, lastSeq } = await fetchRemoteEvents(since)
+        for (const e of events) this.applyRemoteEvent(e)
+        this.lastSeq = Math.max(this.lastSeq, lastSeq)
+      } catch {
+        // The pull failed (offline again). Leave lastSeq at its pre-sync value;
+        // the stream/poller will backfill from there. Our own events are
+        // already on the server and will be deduped on re-fetch.
+      }
+    }
     this.persist()
   }
 
@@ -589,8 +606,16 @@ class ApiClient {
   }
 
   private applyRemoteEvent(e: ServerEvent) {
-    this.lastSeq = Math.max(this.lastSeq, e.seq)
     this.lamport = Math.max(this.lamport, e.lamport)
+    // Advance the cursor only over a contiguous prefix. A non-finite seq (a
+    // legacy server that omits `seq` on live events) must not poison lastSeq
+    // with NaN, and a gap (a dropped live event) must not be skipped: leave
+    // lastSeq at the last contiguous seq so the next pull/stream-reconnect
+    // backfills the gap instead of jumping past it.
+    const seq = e.seq
+    if (typeof seq === 'number' && Number.isFinite(seq) && seq === this.lastSeq + 1) {
+      this.lastSeq = seq
+    }
     if (this.appliedIds.has(e.id)) return
     this.applyEvent(e)
     for (const listener of this.listeners) listener(e)

@@ -78,13 +78,16 @@ func PublishEvents(db *sql.DB, hub *Hub) http.HandlerFunc {
 			}
 		}
 
-		accepted, err := appdb.InsertEvents(db, events...)
+		// Record + project each new event in a single transaction (ApplyEvent
+		// inserts the log row and projects atomically). A projection failure
+		// therefore rolls back the log row too, so a committed-but-unprojected
+		// event can never exist.
+		beforeSeq, err := appdb.LastSeq(db)
 		if err != nil {
-			log.Printf("ERROR publish insert events: %v", err)
-			jsonError(w, "failed to record events", http.StatusInternalServerError)
+			log.Printf("ERROR publish last seq: %v", err)
+			jsonError(w, "failed to read log position", http.StatusInternalServerError)
 			return
 		}
-
 		for _, e := range newEvents {
 			if err := appdb.ApplyEvent(db, e); err != nil {
 				log.Printf("ERROR publish apply event %s: %v", e.ID, err)
@@ -100,15 +103,25 @@ func PublishEvents(db *sql.DB, hub *Hub) http.HandlerFunc {
 			return
 		}
 
-		// Broadcast only after the commit so subscribers never see an
-		// event whose projection they cannot read back yet.
-		for _, e := range newEvents {
-			hub.Publish(e)
+		// Broadcast the committed events WITH their DB-assigned seq so live
+		// subscribers can advance their cursor. The client events carry
+		// seq == 0 (omitted on the wire), so re-select the freshly inserted
+		// rows rather than publishing the request payloads.
+		if len(newEvents) > 0 {
+			stored, err := appdb.GetEventsSince(db, beforeSeq, 0)
+			if err != nil {
+				log.Printf("ERROR publish re-select events: %v", err)
+				jsonError(w, "failed to re-read events", http.StatusInternalServerError)
+				return
+			}
+			for _, e := range stored {
+				hub.Publish(e)
+			}
 		}
 
 		jsonOK(w, PublishResponse{
-			Accepted:   accepted,
-			Duplicates: len(events) - accepted,
+			Accepted:   len(newEvents),
+			Duplicates: len(events) - len(newEvents),
 			LastSeq:    lastSeq,
 		})
 	}
